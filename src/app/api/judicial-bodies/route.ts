@@ -179,6 +179,12 @@ const CHAMBER_NAMES: Record<string, string> = {
   social: 'الغرفة الإجتماعية',
   criminal: 'الغرفة الجنائية',
   misdemeanors: 'غرفة الجنح و المخالفات',
+  // مجلس الدولة
+  admin_disputes: 'غرفة المنازعات الإدارية',
+  tax_disputes: 'غرفة المنازعات الضريبية',
+  elections: 'غرفة الانتخابات',
+  legislation: 'غرفة التشريع',
+  audit: 'غرفة المحاسبات',
   // المجالس القضائية
   penal: 'الغرفة الجزائية',
   indictment: 'غرفة الاتهام',
@@ -190,6 +196,12 @@ const CHAMBER_NAMES: Record<string, string> = {
   // أقسام المحاكم
   contraventions: 'قسم المخالفات',
   violation: 'قسم المخالفات',
+  // أقسام المحكمة التجارية المتخصصة
+  commercial_disputes: 'قسم المنازعات التجارية',
+  companies: 'قسم الشركات',
+  bankruptcy: 'قسم الإفلاس والتسوية القضائية',
+  banking_financial: 'قسم النزاعات البنكية والمالية',
+  urgent_commercial: 'القسم الاستعجالي التجاري',
   // أنواع إضافية
   accusation: 'غرفة الاتهام',
   misdemeanor: 'غرفة الجنح',
@@ -223,9 +235,9 @@ export async function POST(request: NextRequest) {
       type: type,
     };
 
-    // المحكمة العليا ليس لها ولاية
+    // المحكمة العليا ومجلس الدولة ليس لهما ولاية
     // البحث عن معرف الولاية باستخدام رقمها
-    if (type !== 'supreme_court' && wilayaId && !isNaN(parseInt(wilayaId))) {
+    if (type !== 'supreme_court' && type !== 'state_council' && wilayaId && !isNaN(parseInt(wilayaId))) {
       const wilayaNumber = parseInt(wilayaId);
       const wilayaRecord = await db.select().from(wilayas).where(eq(wilayas.number, wilayaNumber)).limit(1);
       if (wilayaRecord.length > 0) {
