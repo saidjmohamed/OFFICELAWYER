@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Database files
+db/*.db
+db/*.db-shm
+db/*.db-wal
+*.db
+*.db-shm
+*.db-wal
+db/temp/
+auto_backup_*.db
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build files
+.next/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test
+coverage/
+
+# Misc
+.vercel/

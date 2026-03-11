@@ -1,0 +1,100 @@
+// الولايات الجزائرية الـ 58 مرتبة حسب الرقم
+export const algerianWilayas = [
+  { number: 1, name: 'أدرار' },
+  { number: 2, name: 'الشلف' },
+  { number: 3, name: 'الأغواط' },
+  { number: 4, name: 'أم البواقي' },
+  { number: 5, name: 'باتنة' },
+  { number: 6, name: 'بجاية' },
+  { number: 7, name: 'بسكرة' },
+  { number: 8, name: 'بشار' },
+  { number: 9, name: 'البليدة' },
+  { number: 10, name: 'البويرة' },
+  { number: 11, name: 'تمنراست' },
+  { number: 12, name: 'تبسة' },
+  { number: 13, name: 'تلمسان' },
+  { number: 14, name: 'تيارت' },
+  { number: 15, name: 'تيزي وزو' },
+  { number: 16, name: 'الجزائر' },
+  { number: 17, name: 'الجلفة' },
+  { number: 18, name: 'جيجل' },
+  { number: 19, name: 'سطيف' },
+  { number: 20, name: 'سعيدة' },
+  { number: 21, name: 'سكيكدة' },
+  { number: 22, name: 'سيدي بلعباس' },
+  { number: 23, name: 'عنابة' },
+  { number: 24, name: 'قالمة' },
+  { number: 25, name: 'قسنطينة' },
+  { number: 26, name: 'المدية' },
+  { number: 27, name: 'مستغانم' },
+  { number: 28, name: 'المسيلة' },
+  { number: 29, name: 'معسكر' },
+  { number: 30, name: 'ورقلة' },
+  { number: 31, name: 'وهران' },
+  { number: 32, name: 'البيض' },
+  { number: 33, name: 'إليزي' },
+  { number: 34, name: 'برج بوعريريج' },
+  { number: 35, name: 'بومرداس' },
+  { number: 36, name: 'الطارف' },
+  { number: 37, name: 'تندوف' },
+  { number: 38, name: 'تيسمسيلت' },
+  { number: 39, name: 'الوادي' },
+  { number: 40, name: 'خنشلة' },
+  { number: 41, name: 'سوق أهراس' },
+  { number: 42, name: 'تيبازة' },
+  { number: 43, name: 'ميلة' },
+  { number: 44, name: 'عين الدفلى' },
+  { number: 45, name: 'النعامة' },
+  { number: 46, name: 'عين تموشنت' },
+  { number: 47, name: 'غرداية' },
+  { number: 48, name: 'غليزان' },
+  { number: 49, name: 'تيميمون' },
+  { number: 50, name: 'برج باجي مختار' },
+  { number: 51, name: 'أولاد جلال' },
+  { number: 52, name: 'بني عباس' },
+  { number: 53, name: 'عين صالح' },
+  { number: 54, name: 'عين قزام' },
+  { number: 55, name: 'تقرت' },
+  { number: 56, name: 'جانت' },
+  { number: 57, name: 'المغير' },
+  { number: 58, name: 'المنيعة' },
+];
+
+// أنواع الهيئات القضائية
+export const judicialBodyTypes = [
+  { value: 'judicial_council', label: 'مجلس قضائي' },
+  { value: 'court', label: 'محكمة' },
+  { value: 'supreme_court', label: 'المحكمة العليا' },
+  { value: 'state_council', label: 'مجلس الدولة' },
+  { value: 'administrative_court', label: 'محكمة إدارية' },
+  { value: 'admin_appeal_court', label: 'محكمة إدارية استئنافية' },
+  { value: 'commercial_court', label: 'محكمة تجارية متخصصة' },
+];
+
+// الأنواع المستقلة (لا تحتاج مجلس أم)
+export const independentBodyTypes = [
+  'supreme_court',
+  'state_council',
+  'administrative_court',
+  'admin_appeal_court',
+  'commercial_court',
+];
+
+// أنواع القضايا
+export const caseTypes = [
+  'مدني',
+  'جزائي',
+  'تجاري',
+  'أحوال شخصية',
+  'عقاري',
+  'عمل',
+  'إداري',
+];
+
+// حالات القضايا
+export const caseStatuses = [
+  { value: 'active', label: 'نشطة' },
+  { value: 'adjourned', label: 'مؤجلة' },
+  { value: 'judged', label: 'محكوم فيها' },
+  { value: 'closed', label: 'مغلقة' },
+];
