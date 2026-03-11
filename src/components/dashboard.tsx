@@ -2,22 +2,20 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Briefcase, Calendar, CalendarDays, DollarSign, Loader2, TrendingUp, Clock, Scale, FileText, Users, Building2, ArrowLeft, Bell, Activity, Archive, AlertCircle } from 'lucide-react';
+import { Briefcase, Calendar, CalendarDays, DollarSign, Loader2, TrendingUp, Clock, Scale, FileText, Users, Building2, ArrowLeft } from 'lucide-react';
 
 interface Stats {
   activeCases: number;
   todaySessions: number;
-  tomorrowSessions: number;
   weekSessions: number;
   totalFees: number;
   totalClients: number;
   totalJudicialBodies: number;
   casesByStatus: Array<{ status: string; count: number }>;
   monthlySessions: Array<{ month: string; count: number }>;
-  upcomingSessions: Array<{ id: number; session_date: number; case_number: string | null; subject: string | null }>;
-  recentCases: Array<{ id: number; caseNumber: string | null; subject: string | null; status: string | null; createdAt: number | null }>;
-  recentActivities: Array<{ id: number; action: string; entityType: string | null; entityId: number | null; description: string; createdAt: number | null }>;
+  casesByWilaya: Array<{ name: string; count: number }>;
+  upcomingSessions: Array<{ id: number; session_date: number; case_number: string; subject: string }>;
+  recentCases: Array<{ id: number; caseNumber: string | null; subject: string | null; status: string | null; createdAt: string | null }>;
 }
 
 // مكون العداد المتحرك
@@ -77,7 +75,7 @@ function PieChart({ data }: { data: Array<{ status: string; count: number }> }) 
     adjourned: '#f59e0b',
     judged: '#22c55e',
     closed: '#6b7280',
-    archived: '#9ca3af',
+    archived: '#8b5cf6',
   };
 
   const labels: Record<string, string> = {
@@ -197,79 +195,6 @@ function BarChart({ data }: { data: Array<{ month: string; count: number }> }) {
   );
 }
 
-// تسمية الإجراءات
-const actionLabels: Record<string, string> = {
-  case_created: 'إنشاء قضية',
-  case_updated: 'تحديث قضية',
-  case_deleted: 'حذف قضية',
-  case_archived: 'أرشفة قضية',
-  session_added: 'إضافة جلسة',
-  session_updated: 'تحديث جلسة',
-  session_deleted: 'حذف جلسة',
-  client_created: 'إنشاء موكل',
-  client_updated: 'تحديث موكل',
-  client_deleted: 'حذف موكل',
-  file_uploaded: 'رفع ملف',
-  file_deleted: 'حذف ملف',
-  expense_added: 'إضافة مصروف',
-  expense_deleted: 'حذف مصروف',
-  backup_created: 'نسخ احتياطي',
-  backup_restored: 'استعادة نسخة',
-  settings_updated: 'تحديث إعدادات',
-};
-
-// أيقونات الإجراءات
-const actionColors: Record<string, string> = {
-  case_created: 'text-blue-500',
-  case_updated: 'text-green-500',
-  case_deleted: 'text-red-500',
-  case_archived: 'text-gray-500',
-  session_added: 'text-purple-500',
-  client_created: 'text-amber-500',
-  file_uploaded: 'text-cyan-500',
-  expense_added: 'text-emerald-500',
-};
-
-// تنسيق التاريخ
-const formatDate = (timestamp: number | null) => {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
-  return date.toLocaleDateString('ar-DZ', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric',
-  });
-};
-
-const formatDateTime = (timestamp: number | null) => {
-  if (!timestamp) return '';
-  const date = new Date(timestamp);
-  return date.toLocaleDateString('ar-DZ', { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
-
-// تسمية حالات القضايا
-const statusLabels: Record<string, string> = {
-  active: 'نشطة',
-  adjourned: 'مؤجلة',
-  judged: 'محكوم',
-  closed: 'مغلقة',
-  archived: 'مؤرشفة',
-};
-
-const statusColors: Record<string, string> = {
-  active: 'bg-blue-100 text-blue-700',
-  adjourned: 'bg-amber-100 text-amber-700',
-  judged: 'bg-green-100 text-green-700',
-  closed: 'bg-gray-100 text-gray-700',
-  archived: 'bg-gray-100 text-gray-500',
-};
-
 export function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -316,12 +241,11 @@ export function Dashboard() {
       icon: Calendar,
       gradient: 'from-emerald-500 to-emerald-600',
       iconBg: 'bg-emerald-500/20',
-      highlight: (stats?.todaySessions || 0) > 0,
     },
     {
-      title: 'جلسات غداً',
-      description: 'الجلسات المجدولة لغداً',
-      value: stats?.tomorrowSessions || 0,
+      title: 'جلسات الأسبوع',
+      description: 'الجلسات المجدولة هذا الأسبوع',
+      value: stats?.weekSessions || 0,
       icon: CalendarDays,
       gradient: 'from-amber-500 to-orange-500',
       iconBg: 'bg-amber-500/20',
@@ -336,6 +260,18 @@ export function Dashboard() {
       isCurrency: true,
     },
   ];
+
+  // تنسيق التاريخ
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('ar-DZ', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -354,48 +290,17 @@ export function Dashboard() {
             </div>
           </div>
         </div>
+        {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-64 h-64 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-48 h-48 bg-white/5 rounded-full translate-x-1/4 translate-y-1/4" />
       </div>
-
-      {/* Session Notifications */}
-      {(stats?.todaySessions || 0) > 0 || (stats?.tomorrowSessions || 0) > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {(stats?.todaySessions || 0) > 0 && (
-            <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-900">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 bg-emerald-100 dark:bg-emerald-900 rounded-xl">
-                  <Bell className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <p className="font-bold text-emerald-700 dark:text-emerald-300">جلسات اليوم</p>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400">لديك {stats?.todaySessions} جلسة مجدولة اليوم</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          {(stats?.tomorrowSessions || 0) > 0 && (
-            <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 bg-amber-100 dark:bg-amber-900 rounded-xl">
-                  <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="font-bold text-amber-700 dark:text-amber-300">جلسات غداً</p>
-                  <p className="text-sm text-amber-600 dark:text-amber-400">لديك {stats?.tomorrowSessions} جلسة مجدولة غداً</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      ) : null}
       
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {cards.map((card, index) => (
           <Card 
             key={card.title} 
-            className={`card-hover border-none shadow-soft overflow-hidden ${card.highlight ? 'ring-2 ring-emerald-400' : ''}`}
+            className="card-hover border-none shadow-soft overflow-hidden"
             style={{ animationDelay: `${index * 100}ms` }}
           >
             <CardHeader className="pb-3">
@@ -420,6 +325,7 @@ export function Dashboard() {
               <CardTitle className="text-base font-semibold mt-1">{card.title}</CardTitle>
               <CardDescription className="text-xs mt-0.5">{card.description}</CardDescription>
             </CardContent>
+            {/* Gradient accent line */}
             <div className={`h-1 w-full bg-gradient-to-l ${card.gradient}`} />
           </Card>
         ))}
@@ -456,13 +362,13 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Recent Cases & Sessions Row */}
+      {/* Bottom Row */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Recent Cases */}
         <Card className="card-hover">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-primary" />
+              <FileText className="h-5 w-5 text-primary" />
               آخر القضايا
             </CardTitle>
             <CardDescription>أحدث القضايا المضافة</CardDescription>
@@ -477,7 +383,7 @@ export function Dashboard() {
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <div className="p-2 bg-primary/10 rounded-lg">
-                      <FileText className="h-4 w-4 text-primary" />
+                      <Briefcase className="h-4 w-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate text-sm">
@@ -487,9 +393,6 @@ export function Dashboard() {
                         {caseItem.subject || 'بدون موضوع'}
                       </p>
                     </div>
-                    <Badge className={statusColors[caseItem.status || 'active']}>
-                      {statusLabels[caseItem.status || 'active']}
-                    </Badge>
                   </a>
                 ))}
               </div>
@@ -502,8 +405,34 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Quick Stats */}
+        <Card className="card-hover">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              إحصائيات إضافية
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-blue-500" />
+                <span>الموكلين</span>
+              </div>
+              <span className="font-bold text-lg">{stats?.totalClients || 0}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-emerald-500" />
+                <span>الهيئات القضائية</span>
+              </div>
+              <span className="font-bold text-lg">{stats?.totalJudicialBodies || 0}</span>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Upcoming Sessions */}
-        <Card className="card-hover lg:col-span-2">
+        <Card className="card-hover">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
@@ -514,153 +443,34 @@ export function Dashboard() {
           <CardContent>
             {stats?.upcomingSessions && stats.upcomingSessions.length > 0 ? (
               <div className="space-y-3">
-                {stats.upcomingSessions.map((session, index) => (
+                {stats.upcomingSessions.slice(0, 4).map((session, index) => (
                   <a
                     key={session.id || index}
                     href={`/?section=sessions`}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <div className="p-2 bg-primary/10 rounded-lg">
                       <Calendar className="h-4 w-4 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">
+                      <p className="font-medium truncate text-sm">
                         {session.case_number || 'بدون رقم'}
                       </p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {session.subject || 'بدون موضوع'}
+                      <p className="text-xs text-muted-foreground truncate">
+                        {formatDate(session.session_date)}
                       </p>
                     </div>
-                    <div className="text-left text-sm text-muted-foreground">
-                      <p>{formatDateTime(session.session_date)}</p>
-                    </div>
-                    <ArrowLeft className="h-4 w-4 text-muted-foreground" />
                   </a>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <Calendar className="h-12 w-12 mb-2 opacity-50" />
-                <p>لا توجد جلسات قادمة</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activity Log & Quick Actions */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Activity Log */}
-        <Card className="card-hover lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              سجل النشاطات
-            </CardTitle>
-            <CardDescription>آخر العمليات في النظام</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats?.recentActivities && stats.recentActivities.length > 0 ? (
-              <div className="space-y-2">
-                {stats.recentActivities.slice(0, 8).map((activity, index) => (
-                  <div
-                    key={activity.id || index}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className={`p-2 rounded-lg bg-muted ${actionColors[activity.action] || 'text-gray-500'}`}>
-                      <Activity className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">
-                        {actionLabels[activity.action] || activity.action}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {activity.description}
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDateTime(activity.createdAt)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
               <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                <Activity className="h-10 w-10 mb-2 opacity-50" />
-                <p className="text-sm">لا توجد نشاطات مسجلة</p>
+                <Calendar className="h-10 w-10 mb-2 opacity-50" />
+                <p className="text-sm">لا توجد جلسات قادمة</p>
               </div>
             )}
           </CardContent>
         </Card>
-
-        {/* Quick Actions & Stats */}
-        <div className="space-y-6">
-          <Card className="card-hover">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                الوصول السريع
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-2">
-                <a 
-                  href="/?section=cases" 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
-                >
-                  <Briefcase className="h-4 w-4 text-blue-500" />
-                  <span>القضايا</span>
-                </a>
-                <a 
-                  href="/?section=calendar" 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
-                >
-                  <CalendarDays className="h-4 w-4 text-emerald-500" />
-                  <span>الرزمانة</span>
-                </a>
-                <a 
-                  href="/?section=clients" 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
-                >
-                  <Users className="h-4 w-4 text-amber-500" />
-                  <span>الموكلين</span>
-                </a>
-                <a 
-                  href="/?section=sessions" 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
-                >
-                  <FileText className="h-4 w-4 text-purple-500" />
-                  <span>الجلسات</span>
-                </a>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="card-hover">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                إحصائيات إضافية
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">الموكلين</span>
-                </div>
-                <span className="font-bold">{stats?.totalClients || 0}</span>
-              </div>
-              <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-emerald-500" />
-                  <span className="text-sm">الهيئات القضائية</span>
-                </div>
-                <span className="font-bold">{stats?.totalJudicialBodies || 0}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );

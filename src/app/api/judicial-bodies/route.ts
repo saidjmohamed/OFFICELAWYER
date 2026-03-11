@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { judicialBodies, chambers, wilayas } from '@/db/schema';
-import { eq, and, isNull, inArray as drizzleInArray, SQL } from 'drizzle-orm';
+import { judicialBodies, chambers, wilayas, cases, sessions } from '@/db/schema';
+import { eq, and, isNull, inArray as drizzleInArray, SQL, or } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
 // أنواع التنظيمات القضائية
@@ -179,12 +179,6 @@ const CHAMBER_NAMES: Record<string, string> = {
   social: 'الغرفة الإجتماعية',
   criminal: 'الغرفة الجنائية',
   misdemeanors: 'غرفة الجنح و المخالفات',
-  // مجلس الدولة
-  admin_disputes: 'غرفة المنازعات الإدارية',
-  tax_disputes: 'غرفة المنازعات الضريبية',
-  elections: 'غرفة الانتخابات',
-  legislation: 'غرفة التشريع',
-  audit: 'غرفة المحاسبات',
   // المجالس القضائية
   penal: 'الغرفة الجزائية',
   indictment: 'غرفة الاتهام',
@@ -196,12 +190,6 @@ const CHAMBER_NAMES: Record<string, string> = {
   // أقسام المحاكم
   contraventions: 'قسم المخالفات',
   violation: 'قسم المخالفات',
-  // أقسام المحكمة التجارية المتخصصة
-  commercial_disputes: 'قسم المنازعات التجارية',
-  companies: 'قسم الشركات',
-  bankruptcy: 'قسم الإفلاس والتسوية القضائية',
-  banking_financial: 'قسم النزاعات البنكية والمالية',
-  urgent_commercial: 'القسم الاستعجالي التجاري',
   // أنواع إضافية
   accusation: 'غرفة الاتهام',
   misdemeanor: 'غرفة الجنح',
@@ -235,9 +223,9 @@ export async function POST(request: NextRequest) {
       type: type,
     };
 
-    // المحكمة العليا ومجلس الدولة ليس لهما ولاية
+    // المحكمة العليا ليس لها ولاية
     // البحث عن معرف الولاية باستخدام رقمها
-    if (type !== 'supreme_court' && type !== 'state_council' && wilayaId && !isNaN(parseInt(wilayaId))) {
+    if (type !== 'supreme_court' && wilayaId && !isNaN(parseInt(wilayaId))) {
       const wilayaNumber = parseInt(wilayaId);
       const wilayaRecord = await db.select().from(wilayas).where(eq(wilayas.number, wilayaNumber)).limit(1);
       if (wilayaRecord.length > 0) {
@@ -350,14 +338,25 @@ export async function DELETE(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
+    const force = searchParams.get('force') === 'true'; // حذف قسري
 
-    console.log('🗑️ طلب حذف هيئة قضائية:', id);
+    console.log('🗑️ طلب حذف هيئة قضائية:', id, 'حذف قسري:', force);
 
     if (!id) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
     const bodyId = parseInt(id);
+
+    // جلب معلومات الهيئة
+    const bodyInfo = await db.select()
+      .from(judicialBodies)
+      .where(eq(judicialBodies.id, bodyId))
+      .limit(1);
+
+    if (bodyInfo.length === 0) {
+      return NextResponse.json({ error: 'الهيئة القضائية غير موجودة' }, { status: 404 });
+    }
 
     // التحقق من عدم وجود هيئات تابعة
     const childBodies = await db.select()
@@ -369,11 +368,78 @@ export async function DELETE(request: NextRequest) {
     if (childBodies.length > 0) {
       return NextResponse.json({ 
         error: 'لا يمكن حذف هذه الهيئة لأنها تحتوي على هيئات تابعة',
-        childCount: childBodies.length
+        childCount: childBodies.length,
+        childNames: childBodies.map(c => c.name)
       }, { status: 400 });
     }
 
-    // حذف الغرف المرتبطة أولاً
+    // جلب الغرف التابعة
+    const bodyChambers = await db.select()
+      .from(chambers)
+      .where(eq(chambers.judicialBodyId, bodyId));
+
+    const chamberIds = bodyChambers.map(c => c.id);
+
+    // التحقق من القضايا المرتبطة بالهيئة مباشرة
+    const casesWithBody = await db.select()
+      .from(cases)
+      .where(eq(cases.judicialBodyId, bodyId))
+      .limit(10);
+
+    // التحقق من القضايا المرتبطة بالغرف
+    let casesWithChambers: any[] = [];
+    if (chamberIds.length > 0) {
+      for (const chamberId of chamberIds) {
+        const chamberCases = await db.select()
+          .from(cases)
+          .where(eq(cases.chamberId, chamberId))
+          .limit(10);
+        casesWithChambers.push(...chamberCases);
+      }
+    }
+
+    const totalCases = casesWithBody.length + casesWithChambers.length;
+
+    console.log('📋 القضايا المرتبطة بالهيئة:', casesWithBody.length);
+    console.log('📋 القضايا المرتبطة بالغرف:', casesWithChambers.length);
+
+    // إذا كانت هناك قضايا ولم يكن الحذف قسرياً
+    if (totalCases > 0 && !force) {
+      return NextResponse.json({ 
+        error: 'لا يمكن حذف هذه الهيئة لأنها تحتوي على قضايا مرتبطة',
+        casesCount: totalCases,
+        casesWithBody: casesWithBody.length,
+        casesWithChambers: casesWithChambers.length,
+        chambersCount: chamberIds.length,
+        caseNumbers: [...casesWithBody, ...casesWithChambers].slice(0, 5).map(c => c.caseNumber || `#${c.id}`),
+        hint: 'استخدم الحذف القسري (force=true) لحذف الهيئة مع تعيين القضايا كـ "بدون هيئة"'
+      }, { status: 400 });
+    }
+
+    // إذا كان الحذف قسرياً، قم بتحديث القضايا المرتبطة
+    if (force && totalCases > 0) {
+      console.log('⚠️ تحديث القضايا المرتبطة...');
+      
+      // تحديث القضايا المرتبطة بالهيئة
+      if (casesWithBody.length > 0) {
+        await db.update(cases)
+          .set({ judicialBodyId: null, chamberId: null, updatedAt: new Date() })
+          .where(eq(cases.judicialBodyId, bodyId));
+        console.log('✅ تم تحديث القضايا المرتبطة بالهيئة:', casesWithBody.length);
+      }
+
+      // تحديث القضايا المرتبطة بالغرف
+      if (chamberIds.length > 0) {
+        for (const chamberId of chamberIds) {
+          await db.update(cases)
+            .set({ chamberId: null, updatedAt: new Date() })
+            .where(eq(cases.chamberId, chamberId));
+        }
+        console.log('✅ تم تحديث القضايا المرتبطة بالغرف');
+      }
+    }
+
+    // حذف الغرف المرتبطة
     const deletedChambersResult = await db.delete(chambers)
       .where(eq(chambers.judicialBodyId, bodyId))
       .returning();
@@ -399,7 +465,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true,
-      deleted: deletedBodies[0]
+      deleted: deletedBodies[0],
+      deletedChambers: deletedChambers.length,
+      updatedCases: force ? totalCases : 0
     });
   } catch (error) {
     console.error('خطأ في حذف هيئة قضائية:', error);

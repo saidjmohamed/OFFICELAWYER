@@ -3,7 +3,6 @@ import { db } from '@/db';
 import { settings } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
-import { DEFAULT_PASSCODE, getAuthConfig } from '@/lib/auth-config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,30 +15,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // محاولة الحصول على الرمز المخزن من قاعدة البيانات
-    let storedPasscode: string | null = null;
+    // الحصول على الرمز المخزن
+    const storedPasscode = await db.select().from(settings).where(eq(settings.key, 'passcode'));
     
-    try {
-      const result = await db.select().from(settings).where(eq(settings.key, 'passcode'));
-      if (result.length > 0 && result[0].value) {
-        storedPasscode = result[0].value;
-      }
-    } catch (dbError) {
-      console.warn('تعذر الوصول لقاعدة البيانات، استخدام الرمز الافتراضي');
+    if (storedPasscode.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'لم يتم إعداد الرمز' },
+        { status: 500 }
+      );
     }
 
-    // استخدام الرمز الافتراضي إذا لم يوجد رمز مخزن
-    const validPasscode = storedPasscode || DEFAULT_PASSCODE;
-
-    if (passcode === validPasscode) {
+    if (storedPasscode[0].value === passcode) {
       // تعيين جلسة المصادقة
       const cookieStore = await cookies();
       cookieStore.set('authenticated', 'true', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: false, // للتطوير المحلي
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 7, // أسبوع
-        path: '/',
       });
 
       return NextResponse.json({ success: true });

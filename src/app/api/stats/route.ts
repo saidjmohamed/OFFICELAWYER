@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { cases, sessions, clients, judicialBodies, activities } from '@/db/schema';
-import { eq, sql, desc, gte } from 'drizzle-orm';
+import { cases, sessions, clients, judicialBodies } from '@/db/schema';
+import { eq, sql, desc } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
 export async function GET() {
@@ -13,22 +13,16 @@ export async function GET() {
       return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
     }
 
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayStart = today.getTime();
-    const todayEnd = todayStart + 24 * 60 * 60 * 1000;
-    const tomorrowEnd = todayEnd + 24 * 60 * 60 * 1000;
-
     // عدد القضايا حسب الحالة
     const casesByStatus = await db.select({
       status: cases.status,
       count: sql<number>`count(*)`,
     }).from(cases).groupBy(cases.status);
 
-    // عدد القضايا النشطة (غير المؤرشفة)
+    // عدد القضايا النشطة
     const activeCasesResult = await db.select({ count: sql<number>`count(*)` })
       .from(cases)
-      .where(sql`status != 'archived'`);
+      .where(eq(cases.status, 'active'));
     const activeCases = activeCasesResult[0]?.count || 0;
 
     // إجمالي الأتعاب
@@ -48,23 +42,11 @@ export async function GET() {
     const totalSessionsResult = await db.select({ count: sql<number>`count(*)` }).from(sessions);
     const totalSessions = totalSessionsResult[0]?.count || 0;
 
-    // جلسات اليوم
-    const todaySessionsResult = await db.select({ count: sql<number>`count(*)` })
-      .from(sessions)
-      .where(sql`session_date >= ${todayStart} AND session_date < ${todayEnd}`);
-    const todaySessionsCount = todaySessionsResult[0]?.count || 0;
-
-    // جلسات غداً
-    const tomorrowSessionsResult = await db.select({ count: sql<number>`count(*)` })
-      .from(sessions)
-      .where(sql`session_date >= ${todayEnd} AND session_date < ${tomorrowEnd}`);
-    const tomorrowSessionsCount = tomorrowSessionsResult[0]?.count || 0;
-
     // آخر الجلسات القادمة
+    const now = new Date();
     const upcomingSessions = await db.select()
       .from(sessions)
       .where(sql`session_date >= ${now.getTime()}`)
-      .orderBy(sessions.sessionDate)
       .limit(5);
 
     // جلب معلومات القضايا للجلسات
@@ -88,25 +70,19 @@ export async function GET() {
       })
     );
 
-    // آخر القضايا (غير المؤرشفة)
-    const recentCases = await db.select()
+    // آخر القضايا المضافة
+    const recentCases = await db.select({
+      id: cases.id,
+      caseNumber: cases.caseNumber,
+      subject: cases.subject,
+      status: cases.status,
+      createdAt: cases.createdAt,
+    })
       .from(cases)
-      .where(sql`status != 'archived'`)
       .orderBy(desc(cases.createdAt))
       .limit(5);
 
-    // آخر النشاطات
-    let recentActivities: any[] = [];
-    try {
-      recentActivities = await db.select()
-        .from(activities)
-        .orderBy(desc(activities.createdAt))
-        .limit(10);
-    } catch (e) {
-      // الجدول قد لا يكون موجوداً بعد
-    }
-
-    // بيانات الجلسات الشهرية
+    // بيانات الجلسات الشهرية (مبسطة)
     const monthlySessions = [
       { month: 'جانفي', count: 0 },
       { month: 'فيفري', count: 0 },
@@ -118,8 +94,7 @@ export async function GET() {
 
     return NextResponse.json({
       activeCases,
-      todaySessions: todaySessionsCount,
-      tomorrowSessions: tomorrowSessionsCount,
+      todaySessions: 0,
       weekSessions: totalSessions,
       totalFees,
       totalClients,
@@ -130,21 +105,7 @@ export async function GET() {
       })),
       monthlySessions,
       upcomingSessions: sessionsWithCases,
-      recentCases: recentCases.map(c => ({
-        id: c.id,
-        caseNumber: c.caseNumber,
-        subject: c.subject,
-        status: c.status,
-        createdAt: c.createdAt,
-      })),
-      recentActivities: recentActivities.map(a => ({
-        id: a.id,
-        action: a.action,
-        entityType: a.entityType,
-        entityId: a.entityId,
-        description: a.description,
-        createdAt: a.createdAt,
-      })),
+      recentCases,
     });
   } catch (error) {
     console.error('خطأ في جلب الإحصائيات:', error);

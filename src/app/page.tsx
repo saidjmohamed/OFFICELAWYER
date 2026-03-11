@@ -15,8 +15,10 @@ import { SettingsSection } from '@/components/sections/settings';
 import { BackupSection } from '@/components/sections/backup';
 import { LawyersSection } from '@/components/sections/lawyers';
 import { OrganizationsSection } from '@/components/sections/organizations';
+import { ActivityLogSection } from '@/components/sections/activity-log';
 import { AboutSection } from '@/components/sections/about';
 import { UpdateNotification } from '@/components/update-notification';
+import { SessionNotifications } from '@/components/session-notifications';
 import { ThemeProvider } from '@/contexts/theme-context';
 import { Loader2 } from 'lucide-react';
 
@@ -42,6 +44,8 @@ function MainContent() {
         return <OrganizationsSection />;
       case 'settings':
         return <SettingsSection />;
+      case 'activity-log':
+        return <ActivityLogSection />;
       case 'backup':
         return <BackupSection />;
       case 'about':
@@ -60,8 +64,11 @@ function MainContent() {
         </div>
         
         {/* Search bar */}
-        <div className="mb-6">
-          <GlobalSearch />
+        <div className="mb-6 flex items-center gap-4">
+          <div className="flex-1">
+            <GlobalSearch />
+          </div>
+          <SessionNotifications />
         </div>
         
         {/* Content */}

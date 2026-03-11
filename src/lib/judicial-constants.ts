@@ -21,16 +21,6 @@ export const STATE_COUNCIL_CHAMBERS = [
   { id: 'audit', name: 'غرفة المحاسبات', hasNumber: true, numberRange: [1, 10], allowNoNumber: true },
 ] as const;
 
-// Section types for المحكمة التجارية المتخصصة (Specialized Commercial Court)
-export const COMMERCIAL_COURT_SECTIONS = [
-  { id: 'commercial_disputes', name: 'قسم المنازعات التجارية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'يختص بالنزاعات بين التجار بمناسبة مزاولتهم التجارة' },
-  { id: 'companies', name: 'قسم الشركات', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'دعاوى تأسيس، بطلان، حل، وتصفية الشركات التجارية' },
-  { id: 'bankruptcy', name: 'قسم الإفلاس والتسوية القضائية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'دعاوى إفلاس الشركات والشركاء' },
-  { id: 'banking_financial', name: 'قسم النزاعات البنكية والمالية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'المنازعات المتعلقة بالنشاط المصرفي' },
-  { id: 'urgent_commercial', name: 'القسم الاستعجالي التجاري', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'للأمور المستعجلة التي لا تحتمل التأخير' },
-  { id: 'maritime', name: 'القسم البحري', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'المنازعات المتعلقة بالتجارة البحرية (في بعض المحاكم)' },
-] as const;
-
 // Chamber types for المجلس القضائي (Judicial Council)
 export const JUDICIAL_COUNCIL_CHAMBERS = [
   { id: 'civil', name: 'الغرفة المدنية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true },
@@ -62,8 +52,7 @@ export const COURT_SECTIONS = [
 // Administrative Judiciary Types
 export const ADMINISTRATIVE_COURT_TYPES = [
   { id: 'admin_appeal_court', name: 'المحكمة الإدارية الاستئنافية', onePerWilaya: true },
-  { id: 'admin_first_instance_court', name: 'المحكمة الإدارية الابتدائية', onePerWilaya: true },
-  { id: 'specialized_commercial_court', name: 'المحكمة التجارية المتخصصة', onePerWilaya: true },
+  { id: 'admin_court', name: 'المحكمة الإدارية الابتدائية', onePerWilaya: true },
 ] as const;
 
 // Main judicial body types
@@ -76,7 +65,7 @@ export const JUDICIAL_BODY_TYPES = {
     icon: 'Scale',
   },
   
-  // مجلس الدولة - لا يتبع أي ولاية
+  // مجلس الدولة - لا تتبع أي ولاية
   state_council: {
     name: 'مجلس الدولة',
     requiresWilaya: false,
@@ -107,10 +96,7 @@ export const JUDICIAL_BODY_TYPES = {
   administrative_judiciary: {
     name: 'القضاء الإداري',
     requiresWilaya: true,
-    subTypes: [
-      { id: 'admin_appeal_court', name: 'المحكمة الإدارية الاستئنافية', onePerWilaya: true },
-      { id: 'admin_court', name: 'المحكمة الإدارية الابتدائية', onePerWilaya: true },
-    ],
+    subTypes: ADMINISTRATIVE_COURT_TYPES,
     icon: 'Briefcase',
   },
   
@@ -119,7 +105,6 @@ export const JUDICIAL_BODY_TYPES = {
     name: 'المحكمة التجارية المتخصصة',
     requiresWilaya: true,
     onePerWilaya: true,
-    chambers: COMMERCIAL_COURT_SECTIONS,
     icon: 'Users',
   },
 } as const;

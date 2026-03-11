@@ -44,7 +44,6 @@ import {
   STATE_COUNCIL_CHAMBERS,
   JUDICIAL_COUNCIL_CHAMBERS,
   COURT_SECTIONS,
-  COMMERCIAL_COURT_SECTIONS,
   WILAYAS_LIST,
   getChamberDisplayName,
 } from '@/lib/judicial-constants';
@@ -177,8 +176,6 @@ export function JudicialBodiesSection() {
         return JUDICIAL_COUNCIL_CHAMBERS;
       case 'court':
         return COURT_SECTIONS;
-      case 'commercial_court':
-        return COMMERCIAL_COURT_SECTIONS;
       default:
         return [];
     }
@@ -211,7 +208,7 @@ export function JudicialBodiesSection() {
       };
       
       // Add wilayaId for non-supreme court and non-state council
-      if (!['supreme_court', 'state_council'].includes(formData.bodyType) && formData.wilayaId) {
+      if (formData.bodyType !== 'supreme_court' && formData.bodyType !== 'state_council' && formData.wilayaId) {
         payload.wilayaId = parseInt(formData.wilayaId);
       }
       
@@ -259,20 +256,50 @@ export function JudicialBodiesSection() {
     }
   };
 
+  const [deleteError, setDeleteError] = useState<{
+    error: string;
+    casesCount?: number;
+    childCount?: number;
+    childNames?: string[];
+    caseNumbers?: string[];
+    hint?: string;
+  } | null>(null);
+  const [forceDelete, setForceDelete] = useState(false);
+
   // Handle delete
   const handleDelete = async () => {
     if (!selectedBody) return;
 
+    setDeleteError(null);
+    
     try {
-      const response = await fetch(`/api/judicial-bodies?id=${selectedBody.id}`, {
+      const response = await fetch(`/api/judicial-bodies?id=${selectedBody.id}${forceDelete ? '&force=true' : ''}`, {
         method: 'DELETE',
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        toast({ title: 'تم الحذف', description: 'تم حذف الهيئة القضائية' });
+        toast({ 
+          title: 'تم الحذف', 
+          description: forceDelete 
+            ? `تم حذف الهيئة وتحديث ${data.updatedCases || 0} قضية` 
+            : 'تم حذف الهيئة القضائية' 
+        });
         setDeleteDialogOpen(false);
         setSelectedBody(null);
+        setForceDelete(false);
         fetchData();
+      } else {
+        // عرض خطأ مع تفاصيل
+        setDeleteError({
+          error: data.error,
+          casesCount: data.casesCount,
+          childCount: data.childCount,
+          childNames: data.childNames,
+          caseNumbers: data.caseNumbers,
+          hint: data.hint,
+        });
       }
     } catch {
       toast({ title: 'خطأ', description: 'حدث خطأ في الحذف', variant: 'destructive' });
@@ -395,7 +422,7 @@ export function JudicialBodiesSection() {
       }
     });
     
-    // Group commercial courts by wilaya (separate section)
+    // Group commercial courts by wilaya
     const commercialWilayasMap = new Map<number, any>();
     commercialCourts.forEach(court => {
       if (court.wilayaId && !commercialWilayasMap.has(court.wilayaId)) {
@@ -666,23 +693,70 @@ export function JudicialBodiesSection() {
                         <div className="p-2 space-y-2">
                           {wilaya.councils.map((council: any) => {
                             const isCouncilExpanded = expandedBodies.has(council.id);
+                            const hasChildren = (council.courts && council.courts.length > 0) || 
+                                                (council.chambers && council.chambers.length > 0);
                             
                             return (
                               <div key={council.id} className="border rounded-lg">
-                                <div 
-                                  className="flex items-center justify-between p-3 bg-blue-50/30 cursor-pointer"
-                                  onClick={() => toggleBody(council.id)}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <ChevronLeft className={cn(
-                                      "h-4 w-4 transition-transform",
-                                      isCouncilExpanded && "rotate-90"
-                                    )} />
+                                <div className="flex items-center justify-between p-3 bg-blue-50/30">
+                                  <div 
+                                    className="flex items-center gap-2 cursor-pointer flex-1"
+                                    onClick={() => toggleBody(council.id)}
+                                  >
+                                    {hasChildren && (
+                                      <ChevronLeft className={cn(
+                                        "h-4 w-4 transition-transform",
+                                        isCouncilExpanded && "rotate-90"
+                                      )} />
+                                    )}
                                     <Building2 className="h-4 w-4 text-blue-600" />
                                     <span>{council.name}</span>
                                     <Badge variant="outline" className="text-xs">
                                       {council.courts?.length || 0} محكمة
                                     </Badge>
+                                  </div>
+                                  {/* أزرار الإجراءات */}
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => {
+                                        setBodyForChambers(council);
+                                        setChambersDialogOpen(true);
+                                      }}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => {
+                                        setSelectedBody(council);
+                                        setFormData({
+                                          bodyType: council.type,
+                                          wilayaId: council.wilayaNumber?.toString() || '',
+                                          parentId: council.parentId?.toString() || '',
+                                          name: council.name,
+                                          selectedChambers: [],
+                                        });
+                                        setDialogOpen(true);
+                                      }}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => {
+                                        setSelectedBody(council);
+                                        setDeleteDialogOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
                                   </div>
                                 </div>
                                 
@@ -1066,12 +1140,12 @@ export function JudicialBodiesSection() {
             )}
             
             {/* Step 5: Chambers Selection */}
-            {['supreme_court', 'state_council', 'judicial_council', 'court', 'commercial_court'].includes(formData.bodyType) &&
+            {['supreme_court', 'state_council', 'judicial_council', 'court'].includes(formData.bodyType) && 
              formData.name && (
               <div className="space-y-4">
                 <h3 className="font-semibold text-primary">
-                  {['supreme_court', 'state_council', 'judicial_council', 'commercial_court'].includes(formData.bodyType)
-                    ? 'الخطوة ' + (['supreme_court', 'state_council'].includes(formData.bodyType) ? '3' : '4')
+                  {['supreme_court', 'state_council', 'judicial_council'].includes(formData.bodyType) 
+                    ? 'الخطوة ' + (['supreme_court', 'state_council'].includes(formData.bodyType) ? '3' : '4') 
                     : 'الخطوة 5'}: اختر الغرف/الأقسام
                 </h3>
                 
@@ -1130,12 +1204,12 @@ export function JudicialBodiesSection() {
             )}
             
             <DialogFooter>
-              <Button
-                type="submit"
+              <Button 
+                type="submit" 
                 disabled={
-                  !formData.bodyType ||
+                  !formData.bodyType || 
                   !formData.name ||
-                  (formData.bodyType !== 'supreme_court' && formData.bodyType !== 'state_council' && !formData.wilayaId) ||
+                  (!['supreme_court', 'state_council'].includes(formData.bodyType) && !formData.wilayaId) ||
                   (formData.bodyType === 'court' && !formData.parentId)
                 }
               >
@@ -1199,18 +1273,72 @@ export function JudicialBodiesSection() {
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+        setDeleteDialogOpen(open);
+        if (!open) {
+          setDeleteError(null);
+          setForceDelete(false);
+        }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
             <AlertDialogDescription>
-              هل أنت متأكد من حذف "{selectedBody?.name}"؟ سيتم حذف جميع الغرف والأقسام المرتبطة به.
+              {deleteError ? (
+                <div className="space-y-3">
+                  <p className="text-destructive font-medium">{deleteError.error}</p>
+                  
+                  {deleteError.childCount && deleteError.childCount > 0 && (
+                    <div className="text-sm bg-muted p-2 rounded">
+                      <p className="font-medium">الهيئات التابعة ({deleteError.childCount}):</p>
+                      <p className="text-muted-foreground">{deleteError.childNames?.join('، ')}</p>
+                    </div>
+                  )}
+                  
+                  {deleteError.casesCount && deleteError.casesCount > 0 && (
+                    <div className="text-sm bg-muted p-2 rounded">
+                      <p className="font-medium">القضايا المرتبطة ({deleteError.casesCount}):</p>
+                      <p className="text-muted-foreground">
+                        {deleteError.caseNumbers?.join('، ')}
+                        {deleteError.casesCount > 5 && ` و ${deleteError.casesCount - 5} أخرى...`}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {deleteError.hint && (
+                    <div className="flex items-center gap-2 pt-2">
+                      <input
+                        type="checkbox"
+                        id="forceDelete"
+                        checked={forceDelete}
+                        onChange={(e) => setForceDelete(e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor="forceDelete" className="text-sm cursor-pointer">
+                        حذف قسري (تعيين القضايا كـ "بدون هيئة")
+                      </label>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                `هل أنت متأكد من حذف "${selectedBody?.name}"؟ سيتم حذف جميع الغرف والأقسام المرتبطة به.`
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-              حذف
+            <AlertDialogCancel onClick={() => {
+              setDeleteError(null);
+              setForceDelete(false);
+            }}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className={cn(
+                "bg-destructive text-destructive-foreground",
+                deleteError && !forceDelete && deleteError.hint && "opacity-50 cursor-not-allowed"
+              )}
+              disabled={deleteError && !forceDelete && !!deleteError.hint}
+            >
+              {forceDelete ? 'حذف قسري' : 'حذف'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

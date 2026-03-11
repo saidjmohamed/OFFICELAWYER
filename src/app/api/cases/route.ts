@@ -67,22 +67,15 @@ export async function GET(request: NextRequest) {
     // جلب قائمة القضايا
     let conditions = [];
     
-    // استبعاد القضايا المؤرشفة افتراضياً ما لم يتم طلبها
     if (status) {
-      conditions.push(eq(cases.status, status as 'active' | 'adjourned' | 'judged' | 'closed' | 'archived'));
-    } else {
-      // استبعاد القضايا المؤرشفة من القائمة الافتراضية
-      conditions.push(sql`${cases.status} != 'archived'`);
+      conditions.push(eq(cases.status, status as 'active' | 'adjourned' | 'judged' | 'closed'));
     }
 
     if (search) {
-      const searchLower = `%${search.toLowerCase()}%`;
       conditions.push(
         or(
-          sql`LOWER(${cases.caseNumber}) LIKE ${searchLower}`,
-          sql`LOWER(${cases.subject}) LIKE ${searchLower}`,
-          sql`LOWER(${cases.notes}) LIKE ${searchLower}`,
-          sql`LOWER(${judicialBodies.name}) LIKE ${searchLower}`
+          ilike(cases.caseNumber, `%${search}%`),
+          ilike(cases.subject, `%${search}%`)
         )
       );
     }

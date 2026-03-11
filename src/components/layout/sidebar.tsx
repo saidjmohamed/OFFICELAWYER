@@ -18,11 +18,22 @@ import {
   ScaleIcon,
   Landmark,
   LayoutDashboard,
+  Sun,
+  Moon,
+  Monitor,
+  Activity,
   Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { Separator } from '@/components/ui/separator';
+import { useTheme } from '@/contexts/theme-context';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const navigation = [
   { 
@@ -83,12 +94,18 @@ const navigation = [
   },
 ];
 
-const settingsNav: Array<{ name: string; href: string; icon: typeof Settings; section: string }> = [
+const settingsNav = [
   { 
     name: 'الإعدادات', 
     href: '/?section=settings', 
     icon: Settings, 
     section: 'settings'
+  },
+  { 
+    name: 'سجل النشاطات', 
+    href: '/?section=activity-log', 
+    icon: Activity, 
+    section: 'activity-log'
   },
   { 
     name: 'النسخ الاحتياطي', 
@@ -122,12 +139,11 @@ function SidebarContent({ activeSection, onNavigate, onLogout, officeSettings }:
   const mainNav = navigation.filter(n => n.group === 'main');
   const recordsNav = navigation.filter(n => n.group === 'records');
   const otherNav = navigation.filter(n => n.group === 'other');
+  const { settings, setMode, isDark } = useTheme();
 
   const displayName = officeSettings?.officeName || officeSettings?.lawyerName || 'مكتب المحامي';
 
-  type NavItemType = { name: string; href: string; icon: typeof Settings; section: string; group?: string };
-  
-  const NavItem = ({ item }: { item: NavItemType }) => {
+  const NavItem = ({ item }: { item: typeof navigation[0] }) => {
     const isActive = activeSection === item.section || (!activeSection && item.section === 'dashboard');
     
     return (
@@ -148,6 +164,19 @@ function SidebarContent({ activeSection, onNavigate, onLogout, officeSettings }:
     );
   };
 
+  // أيقونة الوضع
+  const renderThemeIcon = () => {
+    if (settings.mode === 'system') return <Monitor className="h-4 w-4" />;
+    if (isDark) return <Moon className="h-4 w-4" />;
+    return <Sun className="h-4 w-4" />;
+  };
+
+  const themeLabel = {
+    light: 'فاتح',
+    dark: 'داكن',
+    system: 'تلقائي',
+  };
+
   return (
     <div className="flex h-full flex-col bg-card">
       {/* Logo */}
@@ -163,7 +192,7 @@ function SidebarContent({ activeSection, onNavigate, onLogout, officeSettings }:
             <Scale className="h-5 w-5" />
           </div>
         )}
-        <div className="overflow-hidden">
+        <div className="overflow-hidden flex-1">
           <span className="text-lg font-bold block truncate">{displayName}</span>
           <p className="text-xs text-muted-foreground truncate">نظام إدارة متكامل</p>
         </div>
@@ -212,8 +241,35 @@ function SidebarContent({ activeSection, onNavigate, onLogout, officeSettings }:
         </div>
       </nav>
 
-      {/* Logout */}
-      <div className="border-t p-3">
+      {/* Logout & Theme */}
+      <div className="border-t p-3 space-y-2">
+        {/* Theme Toggle */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-accent"
+            >
+              {renderThemeIcon()}
+              <span>الوضع: {themeLabel[settings.mode]}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-40">
+            <DropdownMenuItem onClick={() => setMode('light')}>
+              <Sun className="h-4 w-4 ml-2" />
+              فاتح
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setMode('dark')}>
+              <Moon className="h-4 w-4 ml-2" />
+              داكن
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setMode('system')}>
+              <Monitor className="h-4 w-4 ml-2" />
+              تلقائي
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"

@@ -76,12 +76,7 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Archive,
-  Printer,
-  Users,
-  User,
-  Phone,
-  MapPin
+  Archive
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -144,8 +139,16 @@ const statusColors: Record<string, string> = {
   adjourned: 'bg-yellow-100 text-yellow-800',
   judged: 'bg-blue-100 text-blue-800',
   closed: 'bg-gray-100 text-gray-800',
-  archived: 'bg-gray-100 text-gray-500',
+  archived: 'bg-purple-100 text-purple-800',
 };
+
+// أنواع الملفات
+const FILE_TYPES = [
+  { value: 'subject', label: 'موضوع', icon: FileText },
+  { value: 'judgment', label: 'حكم', icon: Scale },
+  { value: 'decision', label: 'قرار', icon: FileCheck },
+  { value: 'other', label: 'أخرى', icon: FileQuestion },
+];
 
 // تحويل حجم الملف إلى صيغة مقروءة
 function formatFileSize(bytes: number | null): string {
@@ -243,9 +246,10 @@ interface CaseFile {
   caseId: number;
   fileName: string;
   originalName: string;
-  description: string | null; // الاسم المخصص يُخزن هنا
+  fileType: 'subject' | 'judgment' | 'decision' | 'other';
   mimeType: string | null;
   fileSize: number | null;
+  description: string | null;
 }
 
 // واجهة مصروف القضية
@@ -278,10 +282,8 @@ export function CasesSection() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [caseFiles, setCaseFiles] = useState<CaseFile[]>([]);
   const [expenses, setExpenses] = useState<CaseExpense[]>([]);
-  const [caseParties, setCaseParties] = useState<(CaseParty & { clientName?: string; lawyerName?: string })[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [printMode, setPrintMode] = useState(false);
   
   // حالة إضافة/تعديل جلسة
   const [sessionFormOpen, setSessionFormOpen] = useState(false);
@@ -403,11 +405,10 @@ export function CasesSection() {
   const fetchCaseDetails = async (caseId: number) => {
     setDetailsLoading(true);
     try {
-      const [sessionsRes, filesRes, expensesRes, caseDetailsRes] = await Promise.all([
+      const [sessionsRes, filesRes, expensesRes] = await Promise.all([
         fetch(`/api/sessions?caseId=${caseId}`),
         fetch(`/api/case-files?caseId=${caseId}`),
         fetch(`/api/case-expenses?caseId=${caseId}`),
-        fetch(`/api/cases?id=${caseId}`),
       ]);
 
       if (sessionsRes.ok) {
@@ -420,24 +421,6 @@ export function CasesSection() {
         const expensesData = await expensesRes.json();
         setExpenses(expensesData.data || expensesData);
         setTotalExpenses(expensesData.total || 0);
-      }
-      if (caseDetailsRes.ok) {
-        const caseDetails = await caseDetailsRes.json();
-        // جلب الأطراف مع أسماء الموكلين والمحامين
-        if (caseDetails.parties && Array.isArray(caseDetails.parties)) {
-          const partiesWithNames = caseDetails.parties.map((party: any) => {
-            const client = clients.find(c => c.id === party.clientId);
-            const lawyer = lawyers.find(l => l.id === party.lawyerId);
-            return {
-              ...party,
-              clientName: client?.fullName || null,
-              lawyerName: lawyer ? `${lawyer.firstName || ''} ${lawyer.lastName || ''}`.trim() : null,
-            };
-          });
-          setCaseParties(partiesWithNames);
-        } else {
-          setCaseParties([]);
-        }
       }
     } catch (error) {
       console.error('خطأ في جلب تفاصيل القضية:', error);
@@ -576,9 +559,8 @@ export function CasesSection() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caseId', detailsCase.id.toString());
-      // استخدام الاسم المخصص أو اسم الملف الأصلي
-      const customName = fileUploadForm.customName.trim() || file.name;
-      formData.append('customName', customName);
+      formData.append('fileType', fileUploadForm.fileType);
+      formData.append('description', fileUploadForm.description);
 
       const response = await fetch('/api/case-files', {
         method: 'POST',
@@ -587,7 +569,7 @@ export function CasesSection() {
 
       if (response.ok) {
         toast({ title: 'تم الرفع', description: 'تم رفع الملف بنجاح' });
-        setFileUploadForm({ customName: '' });
+        setFileUploadForm({ fileType: 'subject', description: '' });
         fetchCaseDetails(detailsCase.id);
       } else {
         const error = await response.json();
@@ -942,327 +924,6 @@ export function CasesSection() {
     });
   };
 
-  // دالة طباعة القضية
-  const handlePrintCase = () => {
-    if (!detailsCase) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const plaintiffs = caseParties.filter(p => p.role === 'plaintiff');
-    const defendants = caseParties.filter(p => p.role === 'defendant');
-
-    const printContent = `
-      <!DOCTYPE html>
-      <html lang="ar" dir="rtl">
-      <head>
-        <meta charset="UTF-8">
-        <title>ملف القضية - ${detailsCase.caseNumber || 'بدون رقم'}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: 'Arial', 'Segoe UI', Tahoma, sans-serif; 
-            padding: 20px; 
-            direction: rtl;
-            line-height: 1.8;
-            font-size: 14px;
-          }
-          .header {
-            text-align: center;
-            border-bottom: 3px double #333;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-          }
-          .header h1 { font-size: 24px; margin-bottom: 5px; }
-          .header p { color: #666; font-size: 14px; }
-          .section {
-            margin-bottom: 25px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            overflow: hidden;
-          }
-          .section-title {
-            background: #f5f5f5;
-            padding: 10px 15px;
-            font-weight: bold;
-            font-size: 16px;
-            border-bottom: 1px solid #ddd;
-          }
-          .section-content { padding: 15px; }
-          .info-row {
-            display: flex;
-            border-bottom: 1px solid #eee;
-            padding: 8px 0;
-          }
-          .info-row:last-child { border-bottom: none; }
-          .info-label {
-            width: 150px;
-            font-weight: bold;
-            color: #555;
-          }
-          .info-value { flex: 1; }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-          }
-          th, td {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: right;
-          }
-          th { background: #f5f5f5; font-weight: bold; }
-          .party-card {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            background: #fafafa;
-          }
-          .party-type {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #ddd;
-          }
-          .badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-          }
-          .badge-active { background: #d4edda; color: #155724; }
-          .badge-adjourned { background: #fff3cd; color: #856404; }
-          .badge-judged { background: #cce5ff; color: #004085; }
-          .badge-closed { background: #e2e3e5; color: #383d41; }
-          .footer {
-            margin-top: 30px;
-            text-align: center;
-            color: #888;
-            font-size: 12px;
-            border-top: 1px solid #ddd;
-            padding-top: 15px;
-          }
-          @media print {
-            body { padding: 0; }
-            .section { break-inside: avoid; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>ملف القضية</h1>
-          <p>طبعت بتاريخ: ${new Date().toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-        </div>
-
-        <!-- المعلومات الأساسية -->
-        <div class="section">
-          <div class="section-title">📋 المعلومات الأساسية</div>
-          <div class="section-content">
-            <div class="info-row">
-              <span class="info-label">رقم القضية:</span>
-              <span class="info-value">${detailsCase.caseNumber || '-'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">نوع القضية:</span>
-              <span class="info-value">${CASE_TYPE_LABELS[detailsCase.caseType || ''] || '-'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">الحالة:</span>
-              <span class="info-value">
-                <span class="badge badge-${detailsCase.status}">${statusLabels[detailsCase.status] || '-'}</span>
-              </span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">الهيئة القضائية:</span>
-              <span class="info-value">${detailsCase.judicialBody || '-'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">الغرفة:</span>
-              <span class="info-value">${detailsCase.chamber || '-'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">الولاية:</span>
-              <span class="info-value">${detailsCase.wilaya || '-'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">تاريخ التسجيل:</span>
-              <span class="info-value">${formatDate(detailsCase.registrationDate)}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">تاريخ أول جلسة:</span>
-              <span class="info-value">${formatDate(detailsCase.firstSessionDate)}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">الأتعاب:</span>
-              <span class="info-value">${detailsCase.fees ? detailsCase.fees.toLocaleString('ar-DZ') + ' د.ج' : '-'}</span>
-            </div>
-            ${detailsCase.caseType === 'opposition' || detailsCase.caseType === 'appeal' ? `
-            <div class="info-row">
-              <span class="info-label">رقم الحكم الأصلي:</span>
-              <span class="info-value">${detailsCase.judgmentNumber || '-'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">تاريخ الحكم:</span>
-              <span class="info-value">${formatDate(detailsCase.judgmentDate)}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">المحكمة المصدرة:</span>
-              <span class="info-value">${detailsCase.issuingCourt || '-'}</span>
-            </div>
-            ` : ''}
-            <div class="info-row">
-              <span class="info-label">الموضوع:</span>
-              <span class="info-value">${detailsCase.subject || '-'}</span>
-            </div>
-            ${detailsCase.notes ? `
-            <div class="info-row">
-              <span class="info-label">ملاحظات:</span>
-              <span class="info-value">${detailsCase.notes}</span>
-            </div>
-            ` : ''}
-          </div>
-        </div>
-
-        <!-- أطراف القضية -->
-        <div class="section">
-          <div class="section-title">👥 أطراف القضية</div>
-          <div class="section-content">
-            ${plaintiffs.length > 0 ? `
-              <div class="party-card">
-                <div class="party-type">🟢 المدعين / الموكلين</div>
-                ${plaintiffs.map((p, i) => `
-                  <div style="margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 5px;">
-                    <strong>${i + 1}. ${p.clientName || 'موكل غير محدد'}</strong>
-                    ${p.clientDescription ? `<br><span style="color: #666;">الوصف: ${p.clientDescription}</span>` : ''}
-                    ${p.lawyerName ? `<br><span style="color: #666;">المحامي: ${p.lawyerName}</span>` : ''}
-                    ${p.lawyerDescription ? `<br><span style="color: #666;">${p.lawyerDescription}</span>` : ''}
-                  </div>
-                `).join('')}
-              </div>
-            ` : '<p style="color: #888;">لا يوجد مدعين</p>'}
-            
-            ${defendants.length > 0 ? `
-              <div class="party-card">
-                <div class="party-type">🔴 المدعى عليهم / الخصوم</div>
-                ${defendants.map((p, i) => `
-                  <div style="margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 5px;">
-                    <strong>${i + 1}. ${p.opponentFirstName && p.opponentLastName ? `${p.opponentFirstName} ${p.opponentLastName}` : p.description || 'خصم غير محدد'}</strong>
-                    ${p.opponentPhone ? `<br><span style="color: #666;">الهاتف: ${p.opponentPhone}</span>` : ''}
-                    ${p.opponentAddress ? `<br><span style="color: #666;">العنوان: ${p.opponentAddress}</span>` : ''}
-                    ${p.lawyerName ? `<br><span style="color: #666;">المحامي: ${p.lawyerName}</span>` : ''}
-                  </div>
-                `).join('')}
-              </div>
-            ` : '<p style="color: #888;">لا يوجد مدعى عليهم</p>'}
-          </div>
-        </div>
-
-        <!-- الجلسات والتأجيلات -->
-        <div class="section">
-          <div class="section-title">📅 الجلسات والتأجيلات (${sessions.length} جلسة)</div>
-          <div class="section-content">
-            ${sessions.length > 0 ? `
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 50px;">#</th>
-                    <th style="width: 120px;">تاريخ الجلسة</th>
-                    <th>سبب التأجيل</th>
-                    <th>القرار</th>
-                    <th>ملاحظات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${sessions.map((s, i) => `
-                    <tr>
-                      <td>${i + 1}</td>
-                      <td>${formatDate(s.sessionDate)}</td>
-                      <td>${s.adjournmentReason || '-'}</td>
-                      <td>${s.decision || '-'}</td>
-                      <td>${s.notes || '-'}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            ` : '<p style="color: #888; text-align: center;">لا توجد جلسات مسجلة</p>'}
-          </div>
-        </div>
-
-        <!-- المصاريف -->
-        <div class="section">
-          <div class="section-title">💰 المصاريف (المجموع: ${totalExpenses.toLocaleString('ar-DZ')} د.ج)</div>
-          <div class="section-content">
-            ${expenses.length > 0 ? `
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 50px;">#</th>
-                    <th>الوصف</th>
-                    <th style="width: 120px;">المبلغ</th>
-                    <th style="width: 120px;">التاريخ</th>
-                    <th>ملاحظات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${expenses.map((e, i) => `
-                    <tr>
-                      <td>${i + 1}</td>
-                      <td>${e.description}</td>
-                      <td>${e.amount.toLocaleString('ar-DZ')} د.ج</td>
-                      <td>${formatDate(e.expenseDate)}</td>
-                      <td>${e.notes || '-'}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            ` : '<p style="color: #888; text-align: center;">لا توجد مصاريف مسجلة</p>'}
-          </div>
-        </div>
-
-        <!-- الملفات -->
-        <div class="section">
-          <div class="section-title">📎 الملفات المرفقة (${caseFiles.length} ملف)</div>
-          <div class="section-content">
-            ${caseFiles.length > 0 ? `
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width: 50px;">#</th>
-                    <th>اسم الملف</th>
-                    <th style="width: 100px;">الحجم</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${caseFiles.map((f, i) => `
-                    <tr>
-                      <td>${i + 1}</td>
-                      <td>${f.description || f.originalName}</td>
-                      <td>${formatFileSize(f.fileSize)}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            ` : '<p style="color: #888; text-align: center;">لا توجد ملفات مرفقة</p>'}
-          </div>
-        </div>
-
-        <div class="footer">
-          <p>نظام إدارة مكتب المحامي - تمت الطباعة تلقائياً</p>
-        </div>
-      </body>
-      </html>
-    `;
-
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1424,6 +1085,7 @@ export function CasesSection() {
                         <SelectItem value="adjourned">مؤجلة</SelectItem>
                         <SelectItem value="judged">محكوم فيها</SelectItem>
                         <SelectItem value="closed">مغلقة</SelectItem>
+                        <SelectItem value="archived">مؤرشفة</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1877,6 +1539,7 @@ export function CasesSection() {
               <SelectItem value="adjourned">مؤجلة</SelectItem>
               <SelectItem value="judged">محكوم فيها</SelectItem>
               <SelectItem value="closed">مغلقة</SelectItem>
+              <SelectItem value="archived">مؤرشفة</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -2114,39 +1777,24 @@ export function CasesSection() {
             </div>
           ) : (
             <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between mb-2">
-                <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
-                  <TabsTrigger value="info" className="gap-2">
-                    <Info className="h-4 w-4" />
-                    المعلومات الأساسية
-                  </TabsTrigger>
-                  <TabsTrigger value="parties" className="gap-2">
-                    <Users className="h-4 w-4" />
-                    الأطراف ({caseParties.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="sessions" className="gap-2">
-                    <CalendarDays className="h-4 w-4" />
-                    الجلسات ({sessions.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="files" className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    الملفات ({caseFiles.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="expenses" className="gap-2">
-                    <Receipt className="h-4 w-4" />
-                    المصاريف ({expenses.length})
-                  </TabsTrigger>
-                </TabsList>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrintCase}
-                  className="gap-2"
-                >
-                  <Printer className="h-4 w-4" />
-                  طباعة
-                </Button>
-              </div>
+              <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
+                <TabsTrigger value="info" className="gap-2">
+                  <Info className="h-4 w-4" />
+                  المعلومات الأساسية
+                </TabsTrigger>
+                <TabsTrigger value="sessions" className="gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  الجلسات ({sessions.length})
+                </TabsTrigger>
+                <TabsTrigger value="files" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  الملفات ({caseFiles.length})
+                </TabsTrigger>
+                <TabsTrigger value="expenses" className="gap-2">
+                  <Receipt className="h-4 w-4" />
+                  المصاريف ({expenses.length})
+                </TabsTrigger>
+              </TabsList>
               
               <div className="flex-1 overflow-y-auto mt-4">
                 {/* Basic Info Tab */}
@@ -2154,29 +1802,43 @@ export function CasesSection() {
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                     <div className="flex justify-between items-center">
                       <h3 className="text-lg font-semibold">معلومات القضية</h3>
-                      <Button
-                        variant={editingBasicInfo ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => {
-                          if (editingBasicInfo) {
-                            handleUpdateBasicInfo();
-                          } else {
-                            setEditingBasicInfo(true);
-                          }
-                        }}
-                      >
-                        {editingBasicInfo ? (
-                          <>
-                            <Save className="h-4 w-4 ml-2" />
-                            حفظ
-                          </>
-                        ) : (
-                          <>
-                            <Pencil className="h-4 w-4 ml-2" />
-                            تعديل
-                          </>
-                        )}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (detailsCase) {
+                              window.open(`/api/cases/export?id=${detailsCase.id}`, '_blank');
+                            }
+                          }}
+                        >
+                          <Download className="h-4 w-4 ml-2" />
+                          تصدير
+                        </Button>
+                        <Button
+                          variant={editingBasicInfo ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            if (editingBasicInfo) {
+                              handleUpdateBasicInfo();
+                            } else {
+                              setEditingBasicInfo(true);
+                            }
+                          }}
+                        >
+                          {editingBasicInfo ? (
+                            <>
+                              <Save className="h-4 w-4 ml-2" />
+                              حفظ
+                            </>
+                          ) : (
+                            <>
+                              <Pencil className="h-4 w-4 ml-2" />
+                              تعديل
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
@@ -2228,6 +1890,7 @@ export function CasesSection() {
                               <SelectItem value="adjourned">مؤجلة</SelectItem>
                               <SelectItem value="judged">محكوم فيها</SelectItem>
                               <SelectItem value="closed">مغلقة</SelectItem>
+                              <SelectItem value="archived">مؤرشفة</SelectItem>
                             </SelectContent>
                           </Select>
                         ) : (
@@ -2298,103 +1961,6 @@ export function CasesSection() {
                         />
                       ) : (
                         <p className="font-medium">{detailsCase?.notes || '-'}</p>
-                      )}
-                    </div>
-                  </div>
-                </TabsContent>
-                
-                {/* Parties Tab */}
-                <TabsContent value="parties" className="m-0">
-                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                    <h3 className="text-lg font-semibold mb-4">أطراف القضية</h3>
-                    
-                    {/* المدعين */}
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        المدعين / الموكلين ({caseParties.filter(p => p.role === 'plaintiff').length})
-                      </h4>
-                      {caseParties.filter(p => p.role === 'plaintiff').length === 0 ? (
-                        <p className="text-muted-foreground text-sm pr-6">لا يوجد مدعين مسجلين</p>
-                      ) : (
-                        <div className="space-y-2 pr-6">
-                          {caseParties.filter(p => p.role === 'plaintiff').map((party, index) => (
-                            <Card key={index} className="p-3">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="bg-green-50 text-green-700">
-                                    {index + 1}
-                                  </Badge>
-                                  <span className="font-medium">{party.clientName || 'موكل غير محدد'}</span>
-                                </div>
-                                {party.clientDescription && (
-                                  <p className="text-sm text-muted-foreground pr-6">{party.clientDescription}</p>
-                                )}
-                                {party.lawyerName && (
-                                  <div className="text-sm pr-6 flex items-center gap-2">
-                                    <span className="text-muted-foreground">المحامي:</span>
-                                    <span>{party.lawyerName}</span>
-                                  </div>
-                                )}
-                                {party.lawyerDescription && (
-                                  <p className="text-sm text-muted-foreground pr-6">{party.lawyerDescription}</p>
-                                )}
-                              </div>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <Separator />
-                    
-                    {/* المدعى عليهم */}
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-red-700 dark:text-red-400 flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        المدعى عليهم / الخصوم ({caseParties.filter(p => p.role === 'defendant').length})
-                      </h4>
-                      {caseParties.filter(p => p.role === 'defendant').length === 0 ? (
-                        <p className="text-muted-foreground text-sm pr-6">لا يوجد مدعى عليهم مسجلين</p>
-                      ) : (
-                        <div className="space-y-2 pr-6">
-                          {caseParties.filter(p => p.role === 'defendant').map((party, index) => {
-                            const opponentName = party.opponentFirstName && party.opponentLastName
-                              ? `${party.opponentFirstName} ${party.opponentLastName}`
-                              : party.description || 'خصم غير محدد';
-                            
-                            return (
-                              <Card key={index} className="p-3">
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-red-50 text-red-700">
-                                      {index + 1}
-                                    </Badge>
-                                    <span className="font-medium">{opponentName}</span>
-                                  </div>
-                                  {party.opponentPhone && (
-                                    <div className="text-sm pr-6 flex items-center gap-2">
-                                      <Phone className="h-3 w-3 text-muted-foreground" />
-                                      <span>{party.opponentPhone}</span>
-                                    </div>
-                                  )}
-                                  {party.opponentAddress && (
-                                    <div className="text-sm pr-6 flex items-center gap-2">
-                                      <MapPin className="h-3 w-3 text-muted-foreground" />
-                                      <span>{party.opponentAddress}</span>
-                                    </div>
-                                  )}
-                                  {party.lawyerName && (
-                                    <div className="text-sm pr-6 flex items-center gap-2">
-                                      <span className="text-muted-foreground">المحامي:</span>
-                                      <span>{party.lawyerName}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </Card>
-                            );
-                          })}
-                        </div>
                       )}
                     </div>
                   </div>
@@ -2483,7 +2049,7 @@ export function CasesSection() {
                       <p className="text-muted-foreground mb-4">اسحب الملفات هنا أو</p>
                       <div className="flex items-center justify-center gap-4 flex-wrap">
                         <Input
-                          placeholder="اسم الملف (اختياري - يُستخدم الاسم الأصلي إذا تُرك فارغاً)"
+                          placeholder="اسم الملف (اختياري - اتركه فارغاً للاسم الأصلي)"
                           value={fileUploadForm.customName}
                           onChange={(e) => setFileUploadForm({ ...fileUploadForm, customName: e.target.value })}
                           className="w-64"
@@ -2516,17 +2082,21 @@ export function CasesSection() {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {caseFiles.map((file) => {
+                          const FileTypeIcon = FILE_TYPES.find(t => t.value === file.fileType)?.icon || File;
                           return (
                             <div
                               key={file.id}
                               className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                             >
-                              <File className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+                              <FileTypeIcon className="h-8 w-8 text-muted-foreground flex-shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{file.description || file.originalName}</p>
+                                <p className="font-medium truncate">{file.originalName}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {formatFileSize(file.fileSize)}
+                                  {FILE_TYPES.find(t => t.value === file.fileType)?.label} • {formatFileSize(file.fileSize)}
                                 </p>
+                                {file.description && (
+                                  <p className="text-xs text-muted-foreground truncate">{file.description}</p>
+                                )}
                               </div>
                               <div className="flex gap-1">
                                 <Button

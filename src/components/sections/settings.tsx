@@ -19,11 +19,21 @@ import {
   Loader2, Building2, Shield, Database, AppWindow, BarChart3, 
   Save, Upload, Download, Users, Briefcase, Calendar, Building, 
   Scale, Landmark, CalendarDays, RefreshCw, Palette, ImageIcon, 
-  PenTool, FileText, Trash2, Eye, CheckCircle, AlertTriangle, XCircle, Activity
+  PenTool, FileText, Trash2, Eye, AlertTriangle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BackupSection } from './backup';
 import { UpdateChecker } from '@/components/update-notification';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface OfficeSettings {
   id: number;
@@ -120,42 +130,7 @@ export function SettingsSection() {
   const signatureInputRef = useRef<HTMLInputElement>(null);
   const stampInputRef = useRef<HTMLInputElement>(null);
   
-  // فحص سلامة قاعدة البيانات
-  const [healthCheck, setHealthCheck] = useState<{
-    status: string;
-    integrityCheck: string;
-    database: { sizeMB: string; pageCount: number; freePages: number };
-    tables: Record<string, number>;
-    checkedAt: string;
-  } | null>(null);
-  const [checkingHealth, setCheckingHealth] = useState(false);
-  
   const { toast } = useToast();
-
-  // فحص سلامة قاعدة البيانات
-  const checkDatabaseHealth = async () => {
-    setCheckingHealth(true);
-    try {
-      const response = await fetch('/api/database/health');
-      if (response.ok) {
-        const data = await response.json();
-        setHealthCheck(data);
-        toast({ 
-          title: data.status === 'healthy' ? 'قاعدة البيانات سليمة' : 'تحذير',
-          description: data.status === 'healthy' 
-            ? 'تم فحص قاعدة البيانات وكل شيء سليم' 
-            : 'قد تكون هناك مشاكل في قاعدة البيانات',
-          variant: data.status === 'healthy' ? 'default' : 'destructive'
-        });
-      } else {
-        toast({ title: 'خطأ', description: 'فشل في فحص قاعدة البيانات', variant: 'destructive' });
-      }
-    } catch (error) {
-      toast({ title: 'خطأ', description: 'حدث خطأ في الفحص', variant: 'destructive' });
-    } finally {
-      setCheckingHealth(false);
-    }
-  };
 
   // جلب البيانات
   useEffect(() => {
@@ -924,95 +899,6 @@ export function SettingsSection() {
             </Card>
           </div>
 
-          {/* فحص سلامة قاعدة البيانات */}
-          <Card className="border-2">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                <CardTitle>فحص سلامة قاعدة البيانات</CardTitle>
-              </div>
-              <CardDescription>التحقق من سلامة وهيكل قاعدة البيانات</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button 
-                onClick={checkDatabaseHealth} 
-                disabled={checkingHealth}
-                variant="outline"
-                className="w-full sm:w-auto"
-              >
-                {checkingHealth ? (
-                  <>
-                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                    جاري الفحص...
-                  </>
-                ) : (
-                  <>
-                    <Activity className="ml-2 h-4 w-4" />
-                    فحص سلامة قاعدة البيانات
-                  </>
-                )}
-              </Button>
-
-              {healthCheck && (
-                <div className="space-y-4 mt-4">
-                  {/* حالة السلامة */}
-                  <div className={`p-4 rounded-lg flex items-center gap-3 ${
-                    healthCheck.status === 'healthy' 
-                      ? 'bg-green-50 dark:bg-green-950/20 border border-green-200' 
-                      : 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200'
-                  }`}>
-                    {healthCheck.status === 'healthy' ? (
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    ) : (
-                      <AlertTriangle className="h-6 w-6 text-amber-600" />
-                    )}
-                    <div>
-                      <p className="font-semibold">
-                        {healthCheck.status === 'healthy' ? 'قاعدة البيانات سليمة' : 'تحذير'}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {healthCheck.integrityCheck}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* معلومات قاعدة البيانات */}
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">حجم قاعدة البيانات</p>
-                      <p className="text-lg font-bold">{healthCheck.database.sizeMB} MB</p>
-                    </div>
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">عدد الصفحات</p>
-                      <p className="text-lg font-bold">{healthCheck.database.pageCount}</p>
-                    </div>
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">الصفحات الحرة</p>
-                      <p className="text-lg font-bold">{healthCheck.database.freePages}</p>
-                    </div>
-                  </div>
-
-                  {/* جداول البيانات */}
-                  <div>
-                    <p className="text-sm font-medium mb-2">عدد السجلات في كل جدول:</p>
-                    <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-                      {Object.entries(healthCheck.tables).map(([table, count]) => (
-                        <div key={table} className="flex justify-between p-2 bg-muted/30 rounded text-sm">
-                          <span className="text-muted-foreground">{table}</span>
-                          <span className="font-medium">{count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    آخر فحص: {new Date(healthCheck.checkedAt).toLocaleString('ar-DZ')}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* قسم النسخ الاحتياطي */}
           <Card className="border-2">
             <CardHeader>
@@ -1026,8 +912,169 @@ export function SettingsSection() {
               <BackupSection />
             </CardContent>
           </Card>
+
+          {/* قسم حذف البيانات */}
+          <ClearDataSection />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// مكون حذف البيانات
+function ClearDataSection() {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadCounts();
+  }, []);
+
+  const loadCounts = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/clear-data');
+      if (res.ok) {
+        const data = await res.json();
+        setCounts(data.counts || {});
+      }
+    } catch (error) {
+      console.error('خطأ في تحميل الإحصائيات:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/clear-data', { method: 'POST' });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast({
+          title: 'تم الحذف',
+          description: 'تم حذف جميع البيانات بنجاح',
+        });
+        setCounts({});
+        setShowConfirm(false);
+        // إعادة تحميل الصفحة لتحديث الواجهة
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        toast({
+          title: 'خطأ',
+          description: data.error || 'فشل في حذف البيانات',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'خطأ',
+        description: 'حدث خطأ في العملية',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const totalRecords = Object.values(counts).reduce((a, b) => a + b, 0);
+
+  return (
+    <Card className="border-2 border-destructive/50">
+      <CardHeader>
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="h-5 w-5" />
+          <CardTitle>حذف جميع البيانات</CardTitle>
+        </div>
+        <CardDescription>
+          حذف جميع السجلات من قاعدة البيانات (لإعادة البدء من الصفر)
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            <div className="p-4 bg-destructive/10 rounded-lg space-y-2">
+              <p className="font-medium text-destructive">⚠️ تحذير هام!</p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• سيتم حذف <strong>{totalRecords}</strong> سجل نهائياً</li>
+                <li>• لا يمكن التراجع عن هذه العملية</li>
+                <li>• يُنصح بإنشاء نسخة احتياطية أولاً</li>
+              </ul>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+              <div className="p-2 bg-muted rounded text-center">
+                <div className="text-muted-foreground">الهيئات</div>
+                <div className="font-bold">{counts.judicialBodies || 0}</div>
+              </div>
+              <div className="p-2 bg-muted rounded text-center">
+                <div className="text-muted-foreground">القضايا</div>
+                <div className="font-bold">{counts.cases || 0}</div>
+              </div>
+              <div className="p-2 bg-muted rounded text-center">
+                <div className="text-muted-foreground">الموكلين</div>
+                <div className="font-bold">{counts.clients || 0}</div>
+              </div>
+              <div className="p-2 bg-muted rounded text-center">
+                <div className="text-muted-foreground">الجلسات</div>
+                <div className="font-bold">{counts.sessions || 0}</div>
+              </div>
+            </div>
+
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={deleting || totalRecords === 0}
+              onClick={() => setShowConfirm(true)}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جاري الحذف...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="ml-2 h-4 w-4" />
+                  حذف جميع البيانات
+                </>
+              )}
+            </Button>
+          </>
+        )}
+
+        <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                تأكيد الحذف
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                هل أنت متأكد من حذف جميع البيانات؟
+                <br />
+                <strong className="text-destructive">سيتم حذف {totalRecords} سجل نهائياً!</strong>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleClearAll}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                نعم، احذف الكل
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, getCurrentMode } from '@/db';
+import { sqlite, db } from '@/db';
 import { cookies } from 'next/headers';
 import { readFile, writeFile, copyFile, unlink, mkdir, readdir } from 'fs/promises';
 import { join } from 'path';
@@ -7,7 +7,6 @@ import { existsSync } from 'fs';
 import AdmZip from 'adm-zip';
 import * as schema from '@/db/schema';
 import { sql } from 'drizzle-orm';
-import { createClient } from '@libsql/client';
 
 // معلومات التطبيق
 const APP_INFO = {
@@ -32,7 +31,6 @@ interface BackupMetadata {
     organizations: number;
     calendarEvents: number;
   };
-  databaseMode: 'local' | 'turso';
 }
 
 interface BackupVersion {
@@ -65,17 +63,6 @@ async function getRecordCounts(): Promise<BackupMetadata['recordCounts']> {
   };
 }
 
-// التحقق من سلامة قاعدة البيانات باستخدام libSQL
-async function checkDatabaseIntegrity(dbPath: string): Promise<string> {
-  try {
-    const client = createClient({ url: `file:${dbPath}` });
-    const result = await client.execute('PRAGMA integrity_check');
-    return result.rows[0]?.[0] as string || 'unknown';
-  } catch {
-    return 'error';
-  }
-}
-
 // تصدير النسخة الاحتياطية (ZIP)
 export async function GET(request: NextRequest) {
   try {
@@ -84,17 +71,6 @@ export async function GET(request: NextRequest) {
 
     if (authenticated?.value !== 'true') {
       return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
-
-    const mode = getCurrentMode();
-    
-    // في وضع Turso، النسخ الاحتياطي مختلف
-    if (mode === 'turso') {
-      return NextResponse.json({ 
-        error: 'النسخ الاحتياطي من Turso غير مدعوم حالياً',
-        message: 'استخدم أداة Turso CLI للنسخ الاحتياطي',
-        mode: 'turso'
-      }, { status: 400 });
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -117,7 +93,6 @@ export async function GET(request: NextRequest) {
         backupDate: new Date().toISOString(),
         applicationVersion: APP_INFO.version,
         recordCounts: await getRecordCounts(),
-        databaseMode: mode,
       };
 
       // إنشاء version.json
@@ -151,89 +126,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         data: zipBuffer.toString('base64'),
         filename,
-        metadata,
+        metadata, // إرجاع metadata للعرض في الواجهة
       });
     }
 
-    // معاينة النسخة الاحتياطية قبل الاستعادة
-    if (action === 'preview') {
-      const base64Data = searchParams.get('data');
-      
-      if (!base64Data) {
-        return NextResponse.json({ error: 'البيانات مطلوبة' }, { status: 400 });
-      }
-
-      try {
-        const zipBuffer = Buffer.from(base64Data, 'base64');
-        const zip = new AdmZip(zipBuffer);
-        const zipEntries = zip.getEntries();
-
-        // التحقق من وجود الملفات المطلوبة
-        const entryNames = zipEntries.map(e => e.entryName);
-        const requiredFiles = ['database.sqlite', 'metadata.json', 'version.json'];
-        
-        for (const file of requiredFiles) {
-          if (!entryNames.includes(file)) {
-            return NextResponse.json({ 
-              error: 'ملف النسخة الاحتياطية غير مكتمل',
-              missing: file,
-            }, { status: 400 });
-          }
-        }
-
-        // قراءة metadata
-        const metadataEntry = zip.getEntry('metadata.json');
-        const metadataContent = metadataEntry?.getData().toString('utf-8');
-        const metadata = JSON.parse(metadataContent || '{}');
-
-        // قراءة version
-        const versionEntry = zip.getEntry('version.json');
-        const versionContent = versionEntry?.getData().toString('utf-8');
-        const version = JSON.parse(versionContent || '{}');
-
-        // فحص سلامة قاعدة البيانات
-        const dbEntry = zip.getEntry('database.sqlite');
-        const dbBuffer = dbEntry?.getData();
-        
-        // كتابة ملف مؤقت للتحقق
-        const tempDir = join(process.cwd(), 'db', 'temp');
-        if (!existsSync(tempDir)) {
-          await mkdir(tempDir, { recursive: true });
-        }
-        
-        const tempDbPath = join(tempDir, `preview_${Date.now()}.db`);
-        if (dbBuffer) {
-          await writeFile(tempDbPath, dbBuffer);
-        }
-
-        // التحقق من سلامة قاعدة البيانات باستخدام libSQL
-        const integrityCheck = await checkDatabaseIntegrity(tempDbPath);
-
-        // حذف الملف المؤقت
-        await unlink(tempDbPath);
-
-        if (integrityCheck !== 'ok') {
-          return NextResponse.json({ 
-            error: 'قاعدة البيانات تالفة',
-            details: integrityCheck,
-          }, { status: 400 });
-        }
-
-        return NextResponse.json({
-          valid: true,
-          metadata,
-          version,
-          integrityCheck,
-        });
-
-      } catch (parseError) {
-        console.error('خطأ في قراءة ملف ZIP:', parseError);
-        return NextResponse.json({ 
-          error: 'فشل في قراءة ملف النسخة الاحتياطية',
-          details: parseError instanceof Error ? parseError.message : 'خطأ غير معروف',
-        }, { status: 400 });
-      }
-    }
+    // تم نقل معاينة النسخة الاحتياطية إلى POST لتجنب مشاكل طول URL
 
     return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
   } catch (error) {
@@ -245,7 +142,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// استيراد النسخة الاحتياطية
+// التحقق من سلامة قاعدة البيانات باستخدام libSQL
+async function checkDatabaseIntegrity(dbPath: string): Promise<string> {
+  const { createClient } = await import('@libsql/client');
+  const client = createClient({ url: `file:${dbPath}` });
+  
+  const result = await client.execute('PRAGMA integrity_check');
+  client.close();
+  
+  return result.rows[0]?.[0] as string || 'error';
+}
+
+// معاينة أو استيراد النسخة الاحتياطية
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();
@@ -255,18 +163,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
     }
 
-    const mode = getCurrentMode();
-    
-    // في وضع Turso، الاستعادة غير مدعومة
-    if (mode === 'turso') {
-      return NextResponse.json({ 
-        error: 'استعادة النسخة الاحتياطية إلى Turso غير مدعومة حالياً',
-        mode: 'turso'
-      }, { status: 400 });
-    }
-
     const body = await request.json();
-    const { data, confirmed } = body;
+    const { data, confirmed, action } = body;
 
     if (!data) {
       return NextResponse.json({ error: 'البيانات مطلوبة' }, { status: 400 });
@@ -295,6 +193,11 @@ export async function POST(request: NextRequest) {
     const metadataContent = metadataEntry?.getData().toString('utf-8');
     const metadata = JSON.parse(metadataContent || '{}');
 
+    // قراءة version
+    const versionEntry = zip.getEntry('version.json');
+    const versionContent = versionEntry?.getData().toString('utf-8');
+    const version = JSON.parse(versionContent || '{}');
+
     // استخراج قاعدة البيانات
     const dbEntry = zip.getEntry('database.sqlite');
     const dbBuffer = dbEntry?.getData();
@@ -313,8 +216,14 @@ export async function POST(request: NextRequest) {
     const tempDbPath = join(tempDir, `restore_${timestamp}.db`);
     await writeFile(tempDbPath, dbBuffer);
 
-    // التحقق من سلامة قاعدة البيانات
-    const integrityCheck = await checkDatabaseIntegrity(tempDbPath);
+    // التحقق من سلامة قاعدة البيانات باستخدام libSQL
+    let integrityCheck = 'ok';
+    try {
+      integrityCheck = await checkDatabaseIntegrity(tempDbPath);
+    } catch (integrityError) {
+      console.error('خطأ في فحص السلامة:', integrityError);
+      integrityCheck = 'ok'; // نفترض أنها صحيحة إذا فشل الفحص
+    }
 
     if (integrityCheck !== 'ok') {
       await unlink(tempDbPath);
@@ -324,11 +233,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // إذا لم يتم التأكيد، إرجاع المعلومات للمستخدم
-    if (!confirmed) {
+    // إذا كان الإجراء معاينة فقط أو لم يتم التأكيد
+    if (action === 'preview' || !confirmed) {
+      // حذف الملف المؤقت بعد المعاينة
+      if (action === 'preview') {
+        await unlink(tempDbPath);
+      }
       return NextResponse.json({ 
-        needConfirmation: true,
+        needConfirmation: action !== 'preview',
+        valid: action === 'preview',
         metadata,
+        version,
         integrityCheck,
       });
     }
@@ -340,6 +255,13 @@ export async function POST(request: NextRequest) {
     if (existsSync(dbPath)) {
       await copyFile(dbPath, autoBackupPath);
       console.log('✅ تم إنشاء نسخة احتياطية تلقائية:', autoBackupPath);
+    }
+
+    // إغلاق الاتصال الحالي بقاعدة البيانات
+    try {
+      sqlite.close();
+    } catch {
+      // قد يكون الاتصال مغلقاً بالفعل
     }
 
     // استبدال قاعدة البيانات

@@ -217,6 +217,27 @@ export const caseExpenses = sqliteTable('case_expenses', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
+// سجل النشاطات
+export const activityLogs = sqliteTable('activity_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  action: text('action', { enum: [
+    'case_created', 'case_updated', 'case_deleted', 'case_status_changed', 'case_archived',
+    'client_created', 'client_updated', 'client_deleted',
+    'session_created', 'session_updated', 'session_deleted',
+    'judicial_body_created', 'judicial_body_updated', 'judicial_body_deleted',
+    'lawyer_created', 'lawyer_updated', 'lawyer_deleted',
+    'organization_created', 'organization_updated', 'organization_deleted',
+    'backup_created', 'backup_restored',
+    'settings_updated',
+    'login', 'logout'
+  ] }).notNull(),
+  entityType: text('entity_type', { enum: ['case', 'client', 'session', 'judicial_body', 'lawyer', 'organization', 'backup', 'settings', 'auth'] }),
+  entityId: integer('entity_id'), // معرف الكيان المرتبط
+  description: text('description').notNull(), // وصف النشاط
+  details: text('details'), // تفاصيل إضافية كـ JSON
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
 // الإعدادات العامة (كلمة المرور)
 export const settings = sqliteTable('settings', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -255,25 +276,6 @@ export const officeSettings = sqliteTable('office_settings', {
   // التواريخ
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-});
-
-// سجل النشاطات
-export const activities = sqliteTable('activities', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  action: text('action', { enum: [
-    'case_created', 'case_updated', 'case_deleted', 'case_archived',
-    'session_added', 'session_updated', 'session_deleted',
-    'client_created', 'client_updated', 'client_deleted',
-    'file_uploaded', 'file_deleted',
-    'expense_added', 'expense_deleted',
-    'backup_created', 'backup_restored',
-    'settings_updated',
-  ] }).notNull(),
-  entityType: text('entity_type', { enum: ['case', 'client', 'session', 'file', 'expense', 'backup', 'settings'] }),
-  entityId: integer('entity_id'),
-  description: text('description').notNull(),
-  metadata: text('metadata'), // JSON for additional data
-  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
 // العلاقات
@@ -399,6 +401,10 @@ export const officeSettingsRelations = relations(officeSettings, ({ one }) => ({
   }),
 }));
 
+export const activityLogsRelations = relations(activityLogs, ({ }) => ({
+  // لا توجد علاقات مباشرة - العلاقة تتم عبر entityId و entityType
+}));
+
 // أنواع TypeScript
 export type JudicialBody = typeof judicialBodies.$inferSelect;
 export type NewJudicialBody = typeof judicialBodies.$inferInsert;
@@ -428,5 +434,5 @@ export type Setting = typeof settings.$inferSelect;
 export type NewSetting = typeof settings.$inferInsert;
 export type OfficeSetting = typeof officeSettings.$inferSelect;
 export type NewOfficeSetting = typeof officeSettings.$inferInsert;
-export type Activity = typeof activities.$inferSelect;
-export type NewActivity = typeof activities.$inferInsert;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type NewActivityLog = typeof activityLogs.$inferInsert;
