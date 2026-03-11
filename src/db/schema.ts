@@ -55,6 +55,7 @@ export const judicialBodies = sqliteTable('judicial_bodies', {
   name: text('name').notNull(),
   type: text('type', { enum: [
     'supreme_court',         // المحكمة العليا
+    'state_council',         // مجلس الدولة
     'judicial_council',      // مجلس قضائي
     'court',                 // محكمة
     'admin_appeal_court',    // محكمة إدارية استئنافية

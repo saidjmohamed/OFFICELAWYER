@@ -41,8 +41,10 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
   SUPREME_COURT_CHAMBERS,
+  STATE_COUNCIL_CHAMBERS,
   JUDICIAL_COUNCIL_CHAMBERS,
   COURT_SECTIONS,
+  COMMERCIAL_COURT_SECTIONS,
   WILAYAS_LIST,
   getChamberDisplayName,
 } from '@/lib/judicial-constants';
@@ -72,6 +74,7 @@ interface JudicialBody {
 // Type labels and colors
 const typeLabels: Record<string, string> = {
   supreme_court: 'المحكمة العليا',
+  state_council: 'مجلس الدولة',
   judicial_council: 'مجلس قضائي',
   court: 'محكمة',
   admin_appeal_court: 'محكمة إدارية استئنافية',
@@ -81,6 +84,7 @@ const typeLabels: Record<string, string> = {
 
 const typeColors: Record<string, string> = {
   supreme_court: 'bg-red-100 text-red-800 border-red-200',
+  state_council: 'bg-purple-100 text-purple-800 border-purple-200',
   judicial_council: 'bg-blue-100 text-blue-800 border-blue-200',
   court: 'bg-green-100 text-green-800 border-green-200',
   admin_appeal_court: 'bg-orange-100 text-orange-800 border-orange-200',
@@ -90,6 +94,7 @@ const typeColors: Record<string, string> = {
 
 const typeIcons: Record<string, React.ElementType> = {
   supreme_court: Scale,
+  state_council: Landmark,
   judicial_council: Building2,
   court: Gavel,
   admin_appeal_court: Landmark,
@@ -118,7 +123,7 @@ export function JudicialBodiesSection() {
   const [bodyForChambers, setBodyForChambers] = useState<JudicialBody | null>(null);
   
   // Expanded states
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['supreme_court', 'normal_judiciary', 'admin_judiciary']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['supreme_court', 'state_council', 'normal_judiciary', 'admin_judiciary', 'commercial_judiciary']));
   const [expandedWilayas, setExpandedWilayas] = useState<Set<string>>(new Set());
   const [expandedBodies, setExpandedBodies] = useState<Set<number>>(new Set());
   
@@ -166,10 +171,14 @@ export function JudicialBodiesSection() {
     switch (bodyType) {
       case 'supreme_court':
         return SUPREME_COURT_CHAMBERS;
+      case 'state_council':
+        return STATE_COUNCIL_CHAMBERS;
       case 'judicial_council':
         return JUDICIAL_COUNCIL_CHAMBERS;
       case 'court':
         return COURT_SECTIONS;
+      case 'commercial_court':
+        return COMMERCIAL_COURT_SECTIONS;
       default:
         return [];
     }
@@ -201,8 +210,8 @@ export function JudicialBodiesSection() {
         type: formData.bodyType,
       };
       
-      // Add wilayaId for non-supreme court
-      if (formData.bodyType !== 'supreme_court' && formData.wilayaId) {
+      // Add wilayaId for non-supreme court and non-state council
+      if (!['supreme_court', 'state_council'].includes(formData.bodyType) && formData.wilayaId) {
         payload.wilayaId = parseInt(formData.wilayaId);
       }
       
@@ -342,6 +351,7 @@ export function JudicialBodiesSection() {
   // Organize bodies for display
   const getOrganizedBodies = () => {
     const supremeCourts = bodies.filter(b => b.type === 'supreme_court');
+    const stateCouncils = bodies.filter(b => b.type === 'state_council');
     const judicialCouncils = bodies.filter(b => b.type === 'judicial_council');
     const courts = bodies.filter(b => b.type === 'court');
     const adminAppealCourts = bodies.filter(b => b.type === 'admin_appeal_court');
@@ -369,9 +379,9 @@ export function JudicialBodiesSection() {
       }
     });
     
-    // Group administrative courts by wilaya
+    // Group administrative courts by wilaya (without commercial courts)
     const adminWilayasMap = new Map<number, any>();
-    [...adminAppealCourts, ...adminCourts, ...commercialCourts].forEach(court => {
+    [...adminAppealCourts, ...adminCourts].forEach(court => {
       if (court.wilayaId && !adminWilayasMap.has(court.wilayaId)) {
         adminWilayasMap.set(court.wilayaId, {
           wilayaId: court.wilayaId,
@@ -385,10 +395,28 @@ export function JudicialBodiesSection() {
       }
     });
     
+    // Group commercial courts by wilaya (separate section)
+    const commercialWilayasMap = new Map<number, any>();
+    commercialCourts.forEach(court => {
+      if (court.wilayaId && !commercialWilayasMap.has(court.wilayaId)) {
+        commercialWilayasMap.set(court.wilayaId, {
+          wilayaId: court.wilayaId,
+          wilayaNumber: court.wilayaNumber,
+          wilayaName: court.wilayaName,
+          courts: [],
+        });
+      }
+      if (court.wilayaId) {
+        commercialWilayasMap.get(court.wilayaId).courts.push(court);
+      }
+    });
+    
     return {
       supremeCourts,
+      stateCouncils,
       normalJudiciary: Array.from(wilayasMap.values()),
       adminJudiciary: Array.from(adminWilayasMap.values()),
+      commercialJudiciary: Array.from(commercialWilayasMap.values()),
     };
   };
 
@@ -562,6 +590,35 @@ export function JudicialBodiesSection() {
         )}
       </Card>
 
+      {/* State Council Section */}
+      <Card>
+        <CardHeader 
+          className="cursor-pointer hover:bg-muted/50"
+          onClick={() => toggleSection('state_council')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Landmark className="h-5 w-5 text-purple-600" />
+              <CardTitle>مجلس الدولة</CardTitle>
+              <Badge variant="secondary">{organized.stateCouncils.length}</Badge>
+            </div>
+            <ChevronDown className={cn(
+              "h-5 w-5 transition-transform",
+              expandedSections.has('state_council') && "rotate-180"
+            )} />
+          </div>
+        </CardHeader>
+        {expandedSections.has('state_council') && (
+          <CardContent className="pt-0">
+            {organized.stateCouncils.length > 0 ? (
+              organized.stateCouncils.map(body => renderBody(body))
+            ) : (
+              <p className="text-muted-foreground text-center py-4">لم يتم إضافة مجلس الدولة بعد</p>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
       {/* Normal Judiciary Section */}
       <Card>
         <CardHeader 
@@ -709,6 +766,64 @@ export function JudicialBodiesSection() {
         )}
       </Card>
 
+      {/* Commercial Courts Section */}
+      <Card>
+        <CardHeader 
+          className="cursor-pointer hover:bg-muted/50"
+          onClick={() => toggleSection('commercial_judiciary')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-teal-600" />
+              <CardTitle>المحكمة التجارية المتخصصة</CardTitle>
+              <Badge variant="secondary">{organized.commercialJudiciary.length} ولاية</Badge>
+            </div>
+            <ChevronDown className={cn(
+              "h-5 w-5 transition-transform",
+              expandedSections.has('commercial_judiciary') && "rotate-180"
+            )} />
+          </div>
+        </CardHeader>
+        {expandedSections.has('commercial_judiciary') && (
+          <CardContent className="pt-0">
+            {organized.commercialJudiciary.length > 0 ? (
+              <div className="space-y-2">
+                {organized.commercialJudiciary.map((wilaya: any) => {
+                  const wilayaKey = `commercial_${wilaya.wilayaId}`;
+                  const isWilayaExpanded = expandedWilayas.has(wilayaKey);
+                  
+                  return (
+                    <div key={wilayaKey} className="border rounded-lg">
+                      <div 
+                        className="flex items-center justify-between p-3 bg-teal-50/50 dark:bg-teal-950/20 cursor-pointer"
+                        onClick={() => toggleWilaya(wilayaKey)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <ChevronLeft className={cn(
+                            "h-4 w-4 transition-transform",
+                            isWilayaExpanded && "rotate-90"
+                          )} />
+                          <MapPin className="h-4 w-4 text-primary" />
+                          <span className="font-semibold">{wilaya.wilayaNumber} - {wilaya.wilayaName}</span>
+                        </div>
+                      </div>
+                      
+                      {isWilayaExpanded && (
+                        <div className="p-2 space-y-2">
+                          {wilaya.courts.map((court: any) => renderBody(court))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-4">لم يتم إضافة محاكم تجارية متخصصة بعد</p>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -735,6 +850,22 @@ export function JudicialBodiesSection() {
                     <div className="text-right">
                       <div className="font-medium">المحكمة العليا</div>
                       <div className="text-xs text-muted-foreground">لا تتبع أي ولاية</div>
+                    </div>
+                  </div>
+                </Button>
+                
+                {/* State Council */}
+                <Button
+                  type="button"
+                  variant={formData.bodyType === 'state_council' ? 'default' : 'outline'}
+                  className="h-auto p-4 justify-start"
+                  onClick={() => setFormData({ ...formData, bodyType: 'state_council', wilayaId: '', parentId: '' })}
+                >
+                  <div className="flex items-center gap-3">
+                    <Landmark className="h-5 w-5 text-purple-600" />
+                    <div className="text-right">
+                      <div className="font-medium">مجلس الدولة</div>
+                      <div className="text-xs text-muted-foreground">لا يتبع أي ولاية</div>
                     </div>
                   </div>
                 </Button>
@@ -774,15 +905,31 @@ export function JudicialBodiesSection() {
                 {/* Administrative Courts */}
                 <Button
                   type="button"
-                  variant={['admin_appeal_court', 'admin_court', 'commercial_court'].includes(formData.bodyType) ? 'default' : 'outline'}
-                  className="h-auto p-4 justify-start col-span-2"
+                  variant={['admin_appeal_court', 'admin_court'].includes(formData.bodyType) ? 'default' : 'outline'}
+                  className="h-auto p-4 justify-start"
                   onClick={() => setFormData({ ...formData, bodyType: 'admin_appeal_court' })}
                 >
                   <div className="flex items-center gap-3">
                     <Briefcase className="h-5 w-5 text-orange-600" />
                     <div className="text-right">
                       <div className="font-medium">القضاء الإداري</div>
-                      <div className="text-xs text-muted-foreground">محكمة إدارية استئنافية / ابتدائية / تجارية متخصصة</div>
+                      <div className="text-xs text-muted-foreground">محكمة إدارية استئنافية / ابتدائية</div>
+                    </div>
+                  </div>
+                </Button>
+                
+                {/* Commercial Court */}
+                <Button
+                  type="button"
+                  variant={formData.bodyType === 'commercial_court' ? 'default' : 'outline'}
+                  className="h-auto p-4 justify-start"
+                  onClick={() => setFormData({ ...formData, bodyType: 'commercial_court', parentId: '' })}
+                >
+                  <div className="flex items-center gap-3">
+                    <Users className="h-5 w-5 text-teal-600" />
+                    <div className="text-right">
+                      <div className="font-medium">المحكمة التجارية المتخصصة</div>
+                      <div className="text-xs text-muted-foreground">واحدة لكل ولاية</div>
                     </div>
                   </div>
                 </Button>
@@ -791,8 +938,8 @@ export function JudicialBodiesSection() {
             
             <Separator />
             
-            {/* Step 2: Wilaya Selection (for non-supreme court) */}
-            {formData.bodyType && formData.bodyType !== 'supreme_court' && (
+            {/* Step 2: Wilaya Selection (for non-supreme court and non-state council) */}
+            {formData.bodyType && formData.bodyType !== 'supreme_court' && formData.bodyType !== 'state_council' && (
               <div className="space-y-4">
                 <h3 className="font-semibold text-primary">الخطوة 2: اختر الولاية</h3>
                 
@@ -824,7 +971,7 @@ export function JudicialBodiesSection() {
             )}
             
             {/* Administrative Court Type Selection */}
-            {['admin_appeal_court', 'admin_court', 'commercial_court'].includes(formData.bodyType) && formData.wilayaId && (
+            {['admin_appeal_court', 'admin_court'].includes(formData.bodyType) && formData.wilayaId && (
               <div className="space-y-4">
                 <h3 className="font-semibold text-primary">الخطوة 3: اختر نوع المحكمة الإدارية</h3>
                 
@@ -847,12 +994,6 @@ export function JudicialBodiesSection() {
                       disabled={isWilayaTaken('admin_court', parseInt(formData.wilayaId))}
                     >
                       المحكمة الإدارية الابتدائية
-                    </SelectItem>
-                    <SelectItem 
-                      value="commercial_court"
-                      disabled={isWilayaTaken('commercial_court', parseInt(formData.wilayaId))}
-                    >
-                      المحكمة التجارية المتخصصة
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -891,11 +1032,11 @@ export function JudicialBodiesSection() {
             <Separator />
             
             {/* Step 4: Name */}
-            {formData.bodyType && (formData.bodyType === 'supreme_court' || formData.wilayaId) && (
+            {formData.bodyType && (['supreme_court', 'state_council'].includes(formData.bodyType) || formData.wilayaId) && (
               <div className="space-y-4">
                 <h3 className="font-semibold text-primary">
-                  {['supreme_court', 'judicial_council'].includes(formData.bodyType) 
-                    ? 'الخطوة ' + (formData.bodyType === 'supreme_court' ? '2' : '3') + ': اسم الهيئة'
+                  {['supreme_court', 'state_council', 'judicial_council'].includes(formData.bodyType) 
+                    ? 'الخطوة ' + (['supreme_court', 'state_council'].includes(formData.bodyType) ? '2' : '3') + ': اسم الهيئة'
                     : 'الخطوة 4: اسم المحكمة'}
                 </h3>
                 
@@ -907,6 +1048,8 @@ export function JudicialBodiesSection() {
                     placeholder={
                       formData.bodyType === 'supreme_court' 
                         ? 'المحكمة العليا' 
+                        : formData.bodyType === 'state_council'
+                        ? 'مجلس الدولة'
                         : formData.bodyType === 'judicial_council'
                         ? 'المجلس القضائي لولاية...'
                         : formData.bodyType === 'admin_appeal_court'
@@ -923,12 +1066,12 @@ export function JudicialBodiesSection() {
             )}
             
             {/* Step 5: Chambers Selection */}
-            {['supreme_court', 'judicial_council', 'court'].includes(formData.bodyType) && 
+            {['supreme_court', 'state_council', 'judicial_council', 'court', 'commercial_court'].includes(formData.bodyType) &&
              formData.name && (
               <div className="space-y-4">
                 <h3 className="font-semibold text-primary">
-                  {['supreme_court', 'judicial_council'].includes(formData.bodyType) 
-                    ? 'الخطوة ' + (formData.bodyType === 'supreme_court' ? '3' : '4') 
+                  {['supreme_court', 'state_council', 'judicial_council', 'commercial_court'].includes(formData.bodyType)
+                    ? 'الخطوة ' + (['supreme_court', 'state_council'].includes(formData.bodyType) ? '3' : '4')
                     : 'الخطوة 5'}: اختر الغرف/الأقسام
                 </h3>
                 
@@ -987,12 +1130,12 @@ export function JudicialBodiesSection() {
             )}
             
             <DialogFooter>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={
-                  !formData.bodyType || 
+                  !formData.bodyType ||
                   !formData.name ||
-                  (formData.bodyType !== 'supreme_court' && !formData.wilayaId) ||
+                  (formData.bodyType !== 'supreme_court' && formData.bodyType !== 'state_council' && !formData.wilayaId) ||
                   (formData.bodyType === 'court' && !formData.parentId)
                 }
               >

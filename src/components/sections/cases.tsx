@@ -142,14 +142,6 @@ const statusColors: Record<string, string> = {
   archived: 'bg-gray-100 text-gray-500',
 };
 
-// أنواع الملفات
-const FILE_TYPES = [
-  { value: 'subject', label: 'موضوع', icon: FileText },
-  { value: 'judgment', label: 'حكم', icon: Scale },
-  { value: 'decision', label: 'قرار', icon: FileCheck },
-  { value: 'other', label: 'أخرى', icon: FileQuestion },
-];
-
 // تحويل حجم الملف إلى صيغة مقروءة
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return '0 بايت';
@@ -246,10 +238,9 @@ interface CaseFile {
   caseId: number;
   fileName: string;
   originalName: string;
-  fileType: 'subject' | 'judgment' | 'decision' | 'other';
+  description: string | null; // الاسم المخصص يُخزن هنا
   mimeType: string | null;
   fileSize: number | null;
-  description: string | null;
 }
 
 // واجهة مصروف القضية
@@ -309,8 +300,7 @@ export function CasesSection() {
   // حالة رفع الملفات
   const [uploadingFile, setUploadingFile] = useState(false);
   const [fileUploadForm, setFileUploadForm] = useState({
-    fileType: 'subject' as 'subject' | 'judgment' | 'decision' | 'other',
-    description: '',
+    customName: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -560,8 +550,9 @@ export function CasesSection() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('caseId', detailsCase.id.toString());
-      formData.append('fileType', fileUploadForm.fileType);
-      formData.append('description', fileUploadForm.description);
+      // استخدام الاسم المخصص أو اسم الملف الأصلي
+      const customName = fileUploadForm.customName.trim() || file.name;
+      formData.append('customName', customName);
 
       const response = await fetch('/api/case-files', {
         method: 'POST',
@@ -570,7 +561,7 @@ export function CasesSection() {
 
       if (response.ok) {
         toast({ title: 'تم الرفع', description: 'تم رفع الملف بنجاح' });
-        setFileUploadForm({ fileType: 'subject', description: '' });
+        setFileUploadForm({ customName: '' });
         fetchCaseDetails(detailsCase.id);
       } else {
         const error = await response.json();
@@ -2032,26 +2023,11 @@ export function CasesSection() {
                       <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
                       <p className="text-muted-foreground mb-4">اسحب الملفات هنا أو</p>
                       <div className="flex items-center justify-center gap-4 flex-wrap">
-                        <Select
-                          value={fileUploadForm.fileType}
-                          onValueChange={(value) => setFileUploadForm({ ...fileUploadForm, fileType: value as any })}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {FILE_TYPES.map((type) => (
-                              <SelectItem key={type.value} value={type.value}>
-                                {type.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                         <Input
-                          placeholder="وصف الملف (اختياري)"
-                          value={fileUploadForm.description}
-                          onChange={(e) => setFileUploadForm({ ...fileUploadForm, description: e.target.value })}
-                          className="w-48"
+                          placeholder="اسم الملف (اختياري - يُستخدم الاسم الأصلي إذا تُرك فارغاً)"
+                          value={fileUploadForm.customName}
+                          onChange={(e) => setFileUploadForm({ ...fileUploadForm, customName: e.target.value })}
+                          className="w-64"
                         />
                         <Button
                           onClick={() => fileInputRef.current?.click()}
@@ -2081,21 +2057,17 @@ export function CasesSection() {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {caseFiles.map((file) => {
-                          const FileTypeIcon = FILE_TYPES.find(t => t.value === file.fileType)?.icon || File;
                           return (
                             <div
                               key={file.id}
                               className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                             >
-                              <FileTypeIcon className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+                              <File className="h-8 w-8 text-muted-foreground flex-shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{file.originalName}</p>
+                                <p className="font-medium truncate">{file.description || file.originalName}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {FILE_TYPES.find(t => t.value === file.fileType)?.label} • {formatFileSize(file.fileSize)}
+                                  {formatFileSize(file.fileSize)}
                                 </p>
-                                {file.description && (
-                                  <p className="text-xs text-muted-foreground truncate">{file.description}</p>
-                                )}
                               </div>
                               <div className="flex gap-1">
                                 <Button

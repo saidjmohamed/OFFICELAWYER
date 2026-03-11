@@ -12,6 +12,25 @@ export const SUPREME_COURT_CHAMBERS = [
   { id: 'misdemeanors', name: 'غرفة الجنح و المخالفات', hasNumber: true, numberRange: [1, 10], allowNoNumber: true },
 ] as const;
 
+// Chamber types for مجلس الدولة (State Council)
+export const STATE_COUNCIL_CHAMBERS = [
+  { id: 'admin_disputes', name: 'غرفة المنازعات الإدارية', hasNumber: true, numberRange: [1, 10] },
+  { id: 'tax_disputes', name: 'غرفة المنازعات الضريبية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true },
+  { id: 'elections', name: 'غرفة الانتخابات', hasNumber: true, numberRange: [1, 10], allowNoNumber: true },
+  { id: 'legislation', name: 'غرفة التشريع', hasNumber: true, numberRange: [1, 10], allowNoNumber: true },
+  { id: 'audit', name: 'غرفة المحاسبات', hasNumber: true, numberRange: [1, 10], allowNoNumber: true },
+] as const;
+
+// Section types for المحكمة التجارية المتخصصة (Specialized Commercial Court)
+export const COMMERCIAL_COURT_SECTIONS = [
+  { id: 'commercial_disputes', name: 'قسم المنازعات التجارية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'يختص بالنزاعات بين التجار بمناسبة مزاولتهم التجارة' },
+  { id: 'companies', name: 'قسم الشركات', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'دعاوى تأسيس، بطلان، حل، وتصفية الشركات التجارية' },
+  { id: 'bankruptcy', name: 'قسم الإفلاس والتسوية القضائية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'دعاوى إفلاس الشركات والشركاء' },
+  { id: 'banking_financial', name: 'قسم النزاعات البنكية والمالية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'المنازعات المتعلقة بالنشاط المصرفي' },
+  { id: 'urgent_commercial', name: 'القسم الاستعجالي التجاري', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'للأمور المستعجلة التي لا تحتمل التأخير' },
+  { id: 'maritime', name: 'القسم البحري', hasNumber: true, numberRange: [1, 10], allowNoNumber: true, description: 'المنازعات المتعلقة بالتجارة البحرية (في بعض المحاكم)' },
+] as const;
+
 // Chamber types for المجلس القضائي (Judicial Council)
 export const JUDICIAL_COUNCIL_CHAMBERS = [
   { id: 'civil', name: 'الغرفة المدنية', hasNumber: true, numberRange: [1, 10], allowNoNumber: true },
@@ -57,6 +76,14 @@ export const JUDICIAL_BODY_TYPES = {
     icon: 'Scale',
   },
   
+  // مجلس الدولة - لا يتبع أي ولاية
+  state_council: {
+    name: 'مجلس الدولة',
+    requiresWilaya: false,
+    chambers: STATE_COUNCIL_CHAMBERS,
+    icon: 'Landmark',
+  },
+  
   // القضاء العادي
   normal_judiciary: {
     name: 'القضاء العادي',
@@ -80,8 +107,20 @@ export const JUDICIAL_BODY_TYPES = {
   administrative_judiciary: {
     name: 'القضاء الإداري',
     requiresWilaya: true,
-    subTypes: ADMINISTRATIVE_COURT_TYPES,
+    subTypes: [
+      { id: 'admin_appeal_court', name: 'المحكمة الإدارية الاستئنافية', onePerWilaya: true },
+      { id: 'admin_court', name: 'المحكمة الإدارية الابتدائية', onePerWilaya: true },
+    ],
     icon: 'Briefcase',
+  },
+  
+  // المحكمة التجارية المتخصصة - واحدة لكل ولاية
+  commercial_court: {
+    name: 'المحكمة التجارية المتخصصة',
+    requiresWilaya: true,
+    onePerWilaya: true,
+    chambers: COMMERCIAL_COURT_SECTIONS,
+    icon: 'Users',
   },
 } as const;
 
