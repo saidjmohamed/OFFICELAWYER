@@ -1,18 +1,23 @@
-import { sqlite, db } from './index';
+/**
+ * Database Initialization - تهيئة قاعدة البيانات
+ * 
+ * يعمل مع libSQL (محلي وسحابي)
+ */
+
+import { db, executeSql, getCurrentMode } from './index';
 import * as schema from './schema';
 import { algerianWilayas } from './seed-data';
 import { eq } from 'drizzle-orm';
 
 // دالة آمنة لتنفيذ SQL
-function safeExec(sql: string, description?: string) {
+async function safeExec(sql: string, description?: string) {
   try {
-    sqlite.exec(sql);
+    await executeSql(sql);
     if (description) {
       console.log(`✅ ${description}`);
     }
     return true;
   } catch (error) {
-    // إذا كان الخطأ هو أن الجدول موجود بالفعل، تجاهله
     const errorMessage = error instanceof Error ? error.message : '';
     if (errorMessage.includes('already exists')) {
       return true;
@@ -23,9 +28,12 @@ function safeExec(sql: string, description?: string) {
 }
 
 // إنشاء الجداول
-export function createTables() {
+export async function createTables() {
+  const mode = getCurrentMode();
+  console.log(`🔧 Creating tables in ${mode} mode...`);
+
   // الولايات (يجب أن تكون أولاً)
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS wilayas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       number INTEGER NOT NULL UNIQUE,
@@ -35,11 +43,11 @@ export function createTables() {
   `, 'إنشاء جدول الولايات');
 
   // الهيئات القضائية
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS judicial_bodies (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('supreme_court', 'judicial_council', 'court', 'admin_appeal_court', 'admin_court', 'commercial_court')),
+      type TEXT NOT NULL,
       wilaya_id INTEGER REFERENCES wilayas(id),
       parent_id INTEGER REFERENCES judicial_bodies(id),
       created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
@@ -48,7 +56,7 @@ export function createTables() {
   `, 'إنشاء جدول الهيئات القضائية');
 
   // الغرف والأقسام
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS chambers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -61,24 +69,27 @@ export function createTables() {
   `, 'إنشاء جدول الغرف');
 
   // الموكلين
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS clients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       full_name TEXT,
       phone TEXT,
       address TEXT,
       notes TEXT,
+      client_type TEXT DEFAULT 'natural_person',
+      business_name TEXT,
+      legal_representative TEXT,
       created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
       updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
     )
   `, 'إنشاء جدول الموكلين');
 
   // المنظمات
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS organizations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT,
-      type TEXT CHECK(type IN ('bar_association', 'judicial_council', 'court', 'other')),
+      type TEXT,
       address TEXT,
       phone TEXT,
       wilaya_id INTEGER REFERENCES wilayas(id),
@@ -89,7 +100,7 @@ export function createTables() {
   `, 'إنشاء جدول المنظمات');
 
   // المحامين
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS lawyers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       first_name TEXT,
@@ -104,7 +115,7 @@ export function createTables() {
   `, 'إنشاء جدول المحامين');
 
   // القضايا
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS cases (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       case_number TEXT,
@@ -115,7 +126,7 @@ export function createTables() {
       registration_date INTEGER,
       first_session_date INTEGER,
       subject TEXT,
-      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'adjourned', 'judged', 'closed')),
+      status TEXT DEFAULT 'active',
       fees REAL,
       notes TEXT,
       judgment_number TEXT,
@@ -132,11 +143,11 @@ export function createTables() {
   `, 'إنشاء جدول القضايا');
 
   // جدول الربط بين القضايا والموكلين
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS case_clients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
-      role TEXT DEFAULT 'plaintiff' CHECK(role IN ('plaintiff', 'defendant')),
+      role TEXT DEFAULT 'plaintiff',
       client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
       client_description TEXT,
       opponent_first_name TEXT,
@@ -151,7 +162,7 @@ export function createTables() {
   `, 'إنشاء جدول أطراف القضايا');
 
   // الجلسات
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       case_id INTEGER REFERENCES cases(id) ON DELETE CASCADE,
@@ -166,11 +177,11 @@ export function createTables() {
   `, 'إنشاء جدول الجلسات');
 
   // أحداث التقويم
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS calendar_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('session', 'appointment', 'meeting', 'task')),
+      type TEXT NOT NULL,
       event_date INTEGER,
       end_date INTEGER,
       case_id INTEGER REFERENCES cases(id),
@@ -182,7 +193,7 @@ export function createTables() {
   `, 'إنشاء جدول أحداث التقويم');
 
   // الإعدادات
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       key TEXT NOT NULL UNIQUE,
@@ -192,8 +203,8 @@ export function createTables() {
     )
   `, 'إنشاء جدول الإعدادات');
 
-  // إعدادات المكتب (للتخصيص)
-  safeExec(`
+  // إعدادات المكتب
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS office_settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       office_name TEXT DEFAULT 'مكتب المحامي',
@@ -220,7 +231,7 @@ export function createTables() {
   `, 'إنشاء جدول إعدادات المكتب');
 
   // سجل النشاطات
-  safeExec(`
+  await safeExec(`
     CREATE TABLE IF NOT EXISTS activities (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       action TEXT NOT NULL,
@@ -232,112 +243,34 @@ export function createTables() {
     )
   `, 'إنشاء جدول سجل النشاطات');
 
-  // === التحقق من الهيكل وإضافة الأعمدة المفقودة ===
+  // مصاريف القضايا
+  await safeExec(`
+    CREATE TABLE IF NOT EXISTS case_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      amount REAL NOT NULL,
+      expense_date INTEGER,
+      notes TEXT,
+      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `, 'إنشاء جدول مصاريف القضايا');
 
-  // التحقق من هيكل جدول judicial_bodies
-  try {
-    const columns = sqlite.prepare("PRAGMA table_info(judicial_bodies)").all() as any[];
-    const columnNames = columns.map((col: any) => col.name);
-    
-    if (!columnNames.includes('wilaya_id')) {
-      safeExec(`ALTER TABLE judicial_bodies ADD COLUMN wilaya_id INTEGER REFERENCES wilayas(id) DEFAULT 16`, 'إضافة عمود wilaya_id');
-    }
-    
-    if (!columnNames.includes('parent_id')) {
-      safeExec(`ALTER TABLE judicial_bodies ADD COLUMN parent_id INTEGER REFERENCES judicial_bodies(id)`, 'إضافة عمود parent_id');
-    }
-  } catch (error) {
-    console.log('تحذير: لم نتمكن من تحديث هيكل جدول judicial_bodies');
-  }
-
-  // التحقق من هيكل جدول cases
-  try {
-    const caseColumns = sqlite.prepare("PRAGMA table_info(cases)").all() as any[];
-    const caseColumnNames = caseColumns.map((col: any) => col.name);
-    
-    const newCaseColumns = [
-      { name: 'wilaya_id', sql: 'ALTER TABLE cases ADD COLUMN wilaya_id INTEGER REFERENCES wilayas(id)' },
-      { name: 'first_session_date', sql: 'ALTER TABLE cases ADD COLUMN first_session_date INTEGER' },
-      { name: 'original_case_number', sql: 'ALTER TABLE cases ADD COLUMN original_case_number TEXT' },
-      { name: 'original_court', sql: 'ALTER TABLE cases ADD COLUMN original_court TEXT' },
-      { name: 'judgment_number', sql: 'ALTER TABLE cases ADD COLUMN judgment_number TEXT' },
-      { name: 'judgment_date', sql: 'ALTER TABLE cases ADD COLUMN judgment_date INTEGER' },
-      { name: 'issuing_court', sql: 'ALTER TABLE cases ADD COLUMN issuing_court TEXT' },
-      { name: 'original_judgment_date', sql: 'ALTER TABLE cases ADD COLUMN original_judgment_date INTEGER' },
-      { name: 'council_decision_date', sql: 'ALTER TABLE cases ADD COLUMN council_decision_date INTEGER' },
-      { name: 'council_name', sql: 'ALTER TABLE cases ADD COLUMN council_name TEXT' },
-    ];
-
-    for (const col of newCaseColumns) {
-      if (!caseColumnNames.includes(col.name)) {
-        safeExec(col.sql, `إضافة عمود ${col.name}`);
-      }
-    }
-  } catch (error) {
-    console.log('تحذير: لم نتمكن من تحديث هيكل جدول cases');
-  }
-
-  // التحقق من هيكل جدول case_clients
-  try {
-    const ccColumns = sqlite.prepare("PRAGMA table_info(case_clients)").all() as any[];
-    const ccColumnNames = ccColumns.map((col: any) => col.name);
-    
-    const newCcColumns = [
-      { name: 'role', sql: `ALTER TABLE case_clients ADD COLUMN role TEXT DEFAULT 'plaintiff' CHECK(role IN ('plaintiff', 'defendant'))` },
-      { name: 'description', sql: 'ALTER TABLE case_clients ADD COLUMN description TEXT' },
-      { name: 'opponent_first_name', sql: 'ALTER TABLE case_clients ADD COLUMN opponent_first_name TEXT' },
-      { name: 'opponent_last_name', sql: 'ALTER TABLE case_clients ADD COLUMN opponent_last_name TEXT' },
-      { name: 'opponent_phone', sql: 'ALTER TABLE case_clients ADD COLUMN opponent_phone TEXT' },
-      { name: 'opponent_address', sql: 'ALTER TABLE case_clients ADD COLUMN opponent_address TEXT' },
-      { name: 'lawyer_id', sql: 'ALTER TABLE case_clients ADD COLUMN lawyer_id INTEGER REFERENCES lawyers(id)' },
-      { name: 'client_description', sql: 'ALTER TABLE case_clients ADD COLUMN client_description TEXT' },
-      { name: 'lawyer_description', sql: 'ALTER TABLE case_clients ADD COLUMN lawyer_description TEXT' },
-    ];
-
-    for (const col of newCcColumns) {
-      if (!ccColumnNames.includes(col.name)) {
-        safeExec(col.sql, `إضافة عمود ${col.name}`);
-      }
-    }
-  } catch (error) {
-    console.log('تحذير: لم نتمكن من تحديث هيكل جدول case_clients');
-  }
-
-  // التحقق من هيكل جدول chambers
-  try {
-    const chamberColumns = sqlite.prepare("PRAGMA table_info(chambers)").all() as any[];
-    const chamberColumnNames = chamberColumns.map((col: any) => col.name);
-    
-    if (!chamberColumnNames.includes('chamber_type')) {
-      safeExec('ALTER TABLE chambers ADD COLUMN chamber_type TEXT', 'إضافة عمود chamber_type');
-    }
-    
-    if (!chamberColumnNames.includes('room_number')) {
-      safeExec('ALTER TABLE chambers ADD COLUMN room_number INTEGER', 'إضافة عمود room_number');
-    }
-  } catch (error) {
-    console.log('تحذير: لم نتمكن من تحديث هيكل جدول chambers');
-  }
-
-  // التحقق من هيكل جدول clients (نوع الموكل)
-  try {
-    const clientColumns = sqlite.prepare("PRAGMA table_info(clients)").all() as any[];
-    const clientColumnNames = clientColumns.map((col: any) => col.name);
-    
-    if (!clientColumnNames.includes('client_type')) {
-      safeExec("ALTER TABLE clients ADD COLUMN client_type TEXT DEFAULT 'natural_person' CHECK(client_type IN ('natural_person', 'legal_entity'))", 'إضافة عمود client_type');
-    }
-    
-    if (!clientColumnNames.includes('business_name')) {
-      safeExec('ALTER TABLE clients ADD COLUMN business_name TEXT', 'إضافة عمود business_name');
-    }
-    
-    if (!clientColumnNames.includes('legal_representative')) {
-      safeExec('ALTER TABLE clients ADD COLUMN legal_representative TEXT', 'إضافة عمود legal_representative');
-    }
-  } catch (error) {
-    console.log('تحذير: لم نتمكن من تحديث هيكل جدول clients');
-  }
+  // ملفات القضايا
+  await safeExec(`
+    CREATE TABLE IF NOT EXISTS case_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      case_id INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      file_type TEXT,
+      file_path TEXT,
+      file_size INTEGER,
+      description TEXT,
+      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `, 'إنشاء جدول ملفات القضايا');
 
   console.log('✅ تم إنشاء جميع الجداول');
 }
@@ -376,7 +309,7 @@ export async function seedDatabase() {
 // تهيئة قاعدة البيانات
 export async function initializeDatabase() {
   try {
-    createTables();
+    await createTables();
     await seedDatabase();
     console.log('✅ تم تهيئة قاعدة البيانات بنجاح');
     return { success: true };

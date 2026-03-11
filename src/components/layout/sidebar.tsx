@@ -83,7 +83,7 @@ const navigation = [
   },
 ];
 
-const settingsNav = [
+const settingsNav: Array<{ name: string; href: string; icon: typeof Settings; section: string }> = [
   { 
     name: 'الإعدادات', 
     href: '/?section=settings', 
@@ -125,7 +125,9 @@ function SidebarContent({ activeSection, onNavigate, onLogout, officeSettings }:
 
   const displayName = officeSettings?.officeName || officeSettings?.lawyerName || 'مكتب المحامي';
 
-  const NavItem = ({ item }: { item: typeof navigation[0] }) => {
+  type NavItemType = { name: string; href: string; icon: typeof Settings; section: string; group?: string };
+  
+  const NavItem = ({ item }: { item: NavItemType }) => {
     const isActive = activeSection === item.section || (!activeSection && item.section === 'dashboard');
     
     return (

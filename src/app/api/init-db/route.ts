@@ -1,21 +1,26 @@
 import { NextResponse } from 'next/server';
-import { createTables, seedDatabase } from '@/db/init';
+import { initializeDatabase, createTables, seedDatabase } from '@/db/init';
+import { getCurrentMode } from '@/db';
 
 let initialized = false;
 
 export async function GET() {
   try {
+    const mode = getCurrentMode();
+    
     // Always run createTables to ensure migrations
-    createTables();
+    await createTables();
     
     if (!initialized) {
       await seedDatabase();
       initialized = true;
     }
+    
     return NextResponse.json({ 
       success: true, 
       message: 'تم تهيئة قاعدة البيانات بنجاح',
-      initialized: true 
+      initialized: true,
+      mode: mode
     });
   } catch (error) {
     console.error('خطأ في تهيئة قاعدة البيانات:', error);
