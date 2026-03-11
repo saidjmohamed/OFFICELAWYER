@@ -18,6 +18,7 @@ import {
   ScaleIcon,
   Landmark,
   LayoutDashboard,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -94,6 +95,12 @@ const settingsNav = [
     href: '/?section=backup', 
     icon: Database, 
     section: 'backup'
+  },
+  { 
+    name: 'حول البرنامج', 
+    href: '/?section=about', 
+    icon: Info, 
+    section: 'about'
   },
 ];
 

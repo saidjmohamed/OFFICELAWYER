@@ -15,6 +15,7 @@ import { SettingsSection } from '@/components/sections/settings';
 import { BackupSection } from '@/components/sections/backup';
 import { LawyersSection } from '@/components/sections/lawyers';
 import { OrganizationsSection } from '@/components/sections/organizations';
+import { AboutSection } from '@/components/sections/about';
 import { UpdateNotification } from '@/components/update-notification';
 import { ThemeProvider } from '@/contexts/theme-context';
 import { Loader2 } from 'lucide-react';
@@ -43,6 +44,8 @@ function MainContent() {
         return <SettingsSection />;
       case 'backup':
         return <BackupSection />;
+      case 'about':
+        return <AboutSection />;
       default:
         return <Dashboard />;
     }
