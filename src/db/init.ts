@@ -1,8 +1,9 @@
 import { getClient, db } from './index';
 import * as schema from './schema';
 import { DATABASE_SCHEMA_VERSION } from './schema';
-import { algerianWilayas } from './seed-data';
+import { algerianWilayas, defaultRoles, defaultPermissions, rolePermissionsMap, defaultAdminUser } from './seed-data';
 import { eq, sql } from 'drizzle-orm';
+import crypto from 'crypto';
 
 // دالة آمنة لتنفيذ SQL باستخدام libSQL
 async function safeExec(sql: string, description?: string) {
@@ -361,6 +362,72 @@ export async function createTables() {
     )
   `, 'إنشاء جدول تتبع الإصدارات');
 
+  // === جداول المستخدمين والأدوار ===
+
+  // جدول الأدوار
+  await safeExec(`
+    CREATE TABLE IF NOT EXISTS roles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      name_ar TEXT NOT NULL,
+      description TEXT,
+      is_system INTEGER DEFAULT 0,
+      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `, 'إنشاء جدول الأدوار');
+
+  // جدول الصلاحيات
+  await safeExec(`
+    CREATE TABLE IF NOT EXISTS permissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      name_ar TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('read', 'write', 'delete', 'admin')),
+      description TEXT,
+      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `, 'إنشاء جدول الصلاحيات');
+
+  // جدول صلاحيات الأدوار
+  await safeExec(`
+    CREATE TABLE IF NOT EXISTS role_permissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+      permission_id INTEGER NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+      UNIQUE(role_id, permission_id)
+    )
+  `, 'إنشاء جدول صلاحيات الأدوار');
+
+  // جدول المستخدمين
+  await safeExec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      email TEXT UNIQUE,
+      full_name TEXT,
+      role_id INTEGER REFERENCES roles(id),
+      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'inactive', 'suspended')),
+      last_login_at INTEGER,
+      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `, 'إنشاء جدول المستخدمين');
+
+  // جدول جلسات المستخدمين
+  await safeExec(`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `, 'إنشاء جدول جلسات المستخدمين');
+
   // === التحقق من الهيكل وإضافة الأعمدة المفقودة ===
 
   // التحقق من هيكل جدول judicial_bodies
@@ -560,6 +627,78 @@ export async function seedDatabase() {
         value: '123456',
       });
       console.log('✅ تم إدخال الإعدادات الافتراضية');
+    }
+
+    // === إدخال الأدوار والصلاحيات ===
+    const existingRoles = await db.select().from(schema.roles);
+    
+    if (existingRoles.length === 0) {
+      // إدخال الأدوار
+      await db.insert(schema.roles).values(
+        defaultRoles.map(r => ({
+          name: r.name,
+          nameAr: r.nameAr,
+          description: r.description,
+          isSystem: r.isSystem ? 1 : 0,
+        }))
+      );
+      console.log('✅ تم إدخال الأدوار الافتراضية');
+
+      // إدخال الصلاحيات
+      await db.insert(schema.permissions).values(
+        defaultPermissions.map(p => ({
+          name: p.name,
+          nameAr: p.nameAr,
+          scope: p.scope,
+          type: p.type,
+          description: p.description,
+        }))
+      );
+      console.log('✅ تم إدخال الصلاحيات الافتراضية');
+
+      // جلب معرفات الأدوار والصلاحيات
+      const roles = await db.select().from(schema.roles);
+      const permissions = await db.select().from(schema.permissions);
+
+      // إنشاء خريطة للصلاحيات
+      const permissionMap = new Map(permissions.map(p => [p.name, p.id]));
+      const roleMap = new Map(roles.map(r => [r.name, r.id]));
+
+      // إدخال صلاحيات الأدوار
+      for (const [roleName, perms] of Object.entries(rolePermissionsMap)) {
+        const roleId = roleMap.get(roleName);
+        if (!roleId) continue;
+
+        for (const permName of perms) {
+          const permissionId = permissionMap.get(permName);
+          if (!permissionId) continue;
+
+          await db.insert(schema.rolePermissions).values({
+            roleId,
+            permissionId,
+          });
+        }
+      }
+      console.log('✅ تم إدخال صلاحيات الأدوار');
+
+      // إدخال المستخدم المدير الافتراضي
+      const adminRoleId = roleMap.get('admin');
+      if (adminRoleId) {
+        // تجزئة كلمة المرور
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hash = crypto.pbkdf2Sync(defaultAdminUser.password, salt, 10000, 64, 'sha256').toString('hex');
+        const hashedPassword = `${salt}:${hash}`;
+
+        await db.insert(schema.users).values({
+          username: defaultAdminUser.username,
+          password: hashedPassword,
+          email: defaultAdminUser.email,
+          fullName: defaultAdminUser.fullName,
+          roleId: adminRoleId,
+          status: defaultAdminUser.status,
+        });
+        console.log('✅ تم إدخال المستخدم المدير الافتراضي (admin / admin123)');
+      }
     }
   } catch (error) {
     console.error('خطأ في إدخال البيانات الأولية:', error);

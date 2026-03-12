@@ -3,7 +3,7 @@ import { relations } from 'drizzle-orm';
 
 // ==================== إصدار قاعدة البيانات ====================
 // يجب تحديث هذا الرقم عند أي تغيير في هيكل قاعدة البيانات
-export const DATABASE_SCHEMA_VERSION = 2;
+export const DATABASE_SCHEMA_VERSION = 3;
 
 // الولايات الجزائرية
 export const wilayas = sqliteTable('wilayas', {
@@ -417,6 +417,79 @@ export const activityLogsRelations = relations(activityLogs, ({ }) => ({
   // لا توجد علاقات مباشرة - العلاقة تتم عبر entityId و entityType
 }));
 
+// ==================== جداول المستخدمين والأدوار ====================
+
+// الأدوار
+export const roles = sqliteTable('roles', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull().unique(), // اسم الدور بالإنجليزية (للاستخدام في الكود)
+  nameAr: text('name_ar').notNull(), // اسم الدور بالعربية
+  description: text('description'),
+  isSystem: integer('is_system', { mode: 'boolean' }).default(false), // دور نظام لا يمكن حذفه
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// الصلاحيات
+export const permissions = sqliteTable('permissions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull().unique(), // اسم الصلاحية (cases.read, clients.write, etc.)
+  nameAr: text('name_ar').notNull(), // اسم الصلاحية بالعربية
+  scope: text('scope').notNull(), // نطاق الصلاحية (cases, clients, settings, etc.)
+  type: text('type', { enum: ['read', 'write', 'delete', 'admin'] }).notNull(), // نوع الصلاحية
+  description: text('description'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// صلاحيات الأدوار (ربط many-to-many)
+export const rolePermissions = sqliteTable('role_permissions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  roleId: integer('role_id').references(() => roles.id, { onDelete: 'cascade' }).notNull(),
+  permissionId: integer('permission_id').references(() => permissions.id, { onDelete: 'cascade' }).notNull(),
+});
+
+// المستخدمون
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  password: text('password').notNull(), // كلمة المرور مجزأة
+  email: text('email').unique(),
+  fullName: text('full_name'),
+  roleId: integer('role_id').references(() => roles.id),
+  status: text('status', { enum: ['active', 'inactive', 'suspended'] }).default('active'),
+  lastLoginAt: integer('last_login_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// علاقات المستخدمين والأدوار
+export const rolesRelations = relations(roles, ({ many }) => ({
+  users: many(users),
+  permissions: many(rolePermissions),
+}));
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+  rolePermissions: many(rolePermissions),
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(roles, {
+    fields: [rolePermissions.roleId],
+    references: [roles.id],
+  }),
+  permission: one(permissions, {
+    fields: [rolePermissions.permissionId],
+    references: [permissions.id],
+  }),
+}));
+
+export const usersRelations = relations(users, ({ one }) => ({
+  role: one(roles, {
+    fields: [users.roleId],
+    references: [roles.id],
+  }),
+}));
+
 // أنواع TypeScript
 export type JudicialBody = typeof judicialBodies.$inferSelect;
 export type NewJudicialBody = typeof judicialBodies.$inferInsert;
@@ -450,3 +523,35 @@ export type ActivityLog = typeof activityLogs.$inferSelect;
 export type NewActivityLog = typeof activityLogs.$inferInsert;
 export type SchemaMigration = typeof schemaMigrations.$inferSelect;
 export type NewSchemaMigration = typeof schemaMigrations.$inferInsert;
+
+// أنواع جداول المستخدمين والأدوار
+export type Role = typeof roles.$inferSelect;
+export type NewRole = typeof roles.$inferInsert;
+export type Permission = typeof permissions.$inferSelect;
+export type NewPermission = typeof permissions.$inferInsert;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+export type NewRolePermission = typeof rolePermissions.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+
+// ==================== جلسات المستخدمين ====================
+
+// جلسات المستخدمين (للمصادقة)
+export const userSessions = sqliteTable('user_sessions', {
+  id: text('id').primaryKey(), // معرف الجلسة
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+export const userSessionsRelations = relations(userSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [userSessions.userId],
+    references: [users.id],
+  }),
+}));
+
+export type UserSession = typeof userSessions.$inferSelect;
+export type NewUserSession = typeof userSessions.$inferInsert;

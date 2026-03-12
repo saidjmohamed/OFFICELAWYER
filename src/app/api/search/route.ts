@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 // ==================== أنواع ====================
 
 interface SearchResult {
-  type: 'client' | 'case' | 'lawyer' | 'organization' | 'judicialBody';
+  type: 'client' | 'case' | 'lawyer' | 'organization' | 'judicialBody' | 'session';
   id: number;
   title: string;
   subtitle: string;
@@ -16,6 +16,8 @@ interface SearchResult {
   score: number;
   matchType: 'exact' | 'partial' | 'fuzzy';
   matchedFields: string[];
+  icon?: string;
+  badges?: { label: string; color: string }[];
 }
 
 interface SearchResponse {

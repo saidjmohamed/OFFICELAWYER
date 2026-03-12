@@ -1,25 +1,121 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Briefcase, Calendar, CalendarDays, DollarSign, Loader2, TrendingUp, Clock, Scale, FileText, Users, Building2, ArrowLeft } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Briefcase, Calendar, CalendarDays, DollarSign, Loader2, TrendingUp, Clock, Scale, 
+  FileText, Users, Building2, Bell, Activity, Receipt, AlertCircle, CheckCircle2,
+  XCircle, Archive, PauseCircle
+} from 'lucide-react';
+import {
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  LineChart, Line, ResponsiveContainer, Area, AreaChart
+} from 'recharts';
+
+// ==================== Interfaces ====================
+interface CaseByStatus {
+  status: string;
+  label: string;
+  count: number;
+  color: string;
+}
+
+interface CaseByType {
+  type: string;
+  label: string;
+  count: number;
+  color: string;
+}
+
+interface MonthlyStat {
+  month: string;
+  monthIndex: number;
+  year: number;
+  cases: number;
+  sessions: number;
+}
+
+interface UpcomingSession {
+  id: number;
+  sessionDate: number | null;
+  caseNumber: string | null;
+  subject: string | null;
+  caseType: string | null;
+}
+
+interface RecentCase {
+  id: number;
+  caseNumber: string | null;
+  subject: string | null;
+  caseType: string | null;
+  status: string | null;
+  createdAt: string | null;
+}
+
+interface RecentActivity {
+  id: number;
+  action: string | null;
+  entityType: string | null;
+  description: string | null;
+  createdAt: string | null;
+}
 
 interface Stats {
   activeCases: number;
+  totalCases: number;
   todaySessions: number;
   weekSessions: number;
   totalFees: number;
+  totalExpenses: number;
   totalClients: number;
   totalJudicialBodies: number;
-  casesByStatus: Array<{ status: string; count: number }>;
-  monthlySessions: Array<{ month: string; count: number }>;
-  casesByWilaya: Array<{ name: string; count: number }>;
-  upcomingSessions: Array<{ id: number; session_date: number; case_number: string; subject: string }>;
-  recentCases: Array<{ id: number; caseNumber: string | null; subject: string | null; status: string | null; createdAt: string | null }>;
+  casesByStatus: CaseByStatus[];
+  casesByType: CaseByType[];
+  monthlyStats: MonthlyStat[];
+  upcomingSessions: UpcomingSession[];
+  recentCases: RecentCase[];
+  recentActivities: RecentActivity[];
 }
 
-// مكون العداد المتحرك
-function AnimatedNumber({ value, duration = 1000 }: { value: number; duration?: number }) {
+// ==================== Animation Variants ====================
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: 'easeOut'
+    }
+  }
+};
+
+const cardHoverVariants = {
+  rest: { scale: 1 },
+  hover: { 
+    scale: 1.02,
+    transition: { duration: 0.2 }
+  }
+};
+
+// ==================== Animated Number Component ====================
+function AnimatedNumber({ value, duration = 1000, isCurrency = false }: { 
+  value: number; 
+  duration?: number;
+  isCurrency?: boolean;
+}) {
   const [displayValue, setDisplayValue] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const hasAnimated = useRef(false);
@@ -56,145 +152,160 @@ function AnimatedNumber({ value, duration = 1000 }: { value: number; duration?: 
     return () => observer.disconnect();
   }, [value, duration]);
 
-  return <span ref={ref}>{displayValue.toLocaleString('ar-DZ')}</span>;
+  return (
+    <span ref={ref}>
+      {displayValue.toLocaleString('ar-DZ')}
+      {isCurrency && <span className="text-lg mr-1">د.ج</span>}
+    </span>
+  );
 }
 
-// رسم بياني دائري بسيط
-function PieChart({ data }: { data: Array<{ status: string; count: number }> }) {
-  const total = data.reduce((sum, item) => sum + item.count, 0);
-  if (total === 0) {
+// ==================== Custom Tooltip for Charts ====================
+const CustomTooltip = ({ active, payload, label }: { 
+  active?: boolean; 
+  payload?: Array<{ value: number; name: string; color: string }>; 
+  label?: string;
+}) => {
+  if (active && payload && payload.length) {
     return (
-      <div className="flex items-center justify-center h-48 text-muted-foreground">
-        لا توجد بيانات
+      <div className="bg-popover border rounded-lg shadow-lg p-3">
+        <p className="font-medium mb-1">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {entry.value}
+          </p>
+        ))}
       </div>
     );
   }
+  return null;
+};
 
-  const colors: Record<string, string> = {
-    active: '#3b82f6',
-    adjourned: '#f59e0b',
-    judged: '#22c55e',
-    closed: '#6b7280',
-    archived: '#8b5cf6',
-  };
-
-  const labels: Record<string, string> = {
-    active: 'نشطة',
-    adjourned: 'مؤجلة',
-    judged: 'محكوم',
-    closed: 'مغلقة',
-    archived: 'مؤرشفة',
-  };
-
-  // حساب الزوايا باستخدام reduce
-  const segments = data.reduce<Array<{
-    status: string;
-    count: number;
-    percentage: number;
-    startAngle: number;
-    endAngle: number;
-    color: string;
-    label: string;
-  }>>((acc, item, index) => {
-    const prevEndAngle = index > 0 ? acc[index - 1].endAngle : 0;
-    const percentage = (item.count / total) * 100;
-    const angle = (item.count / total) * 360;
-    
-    acc.push({
-      ...item,
-      percentage,
-      startAngle: prevEndAngle,
-      endAngle: prevEndAngle + angle,
-      color: colors[item.status] || '#6b7280',
-      label: labels[item.status] || item.status,
-    });
-    return acc;
-  }, []);
-
-  const createArcPath = (startAngle: number, endAngle: number, radius: number = 80) => {
-    const startRad = (startAngle - 90) * (Math.PI / 180);
-    const endRad = (endAngle - 90) * (Math.PI / 180);
-    const cx = 100, cy = 100;
-    
-    const x1 = cx + radius * Math.cos(startRad);
-    const y1 = cy + radius * Math.sin(startRad);
-    const x2 = cx + radius * Math.cos(endRad);
-    const y2 = cy + radius * Math.sin(endRad);
-    
-    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-    
-    return `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-  };
-
+// ==================== Stats Card Component ====================
+function StatsCard({ 
+  title, 
+  description, 
+  value, 
+  icon: Icon, 
+  gradient, 
+  iconBg,
+  isCurrency = false,
+  delay = 0 
+}: { 
+  title: string;
+  description: string;
+  value: number;
+  icon: React.ElementType;
+  gradient: string;
+  iconBg: string;
+  isCurrency?: boolean;
+  delay?: number;
+}) {
   return (
-    <div className="flex items-center gap-4">
-      <svg viewBox="0 0 200 200" className="w-40 h-40">
-        {segments.map((segment, index) => (
-          <path
-            key={index}
-            d={createArcPath(segment.startAngle, segment.endAngle)}
-            fill={segment.color}
-            className="transition-all duration-300 hover:opacity-80"
-            style={{ transformOrigin: 'center' }}
-          />
-        ))}
-        <circle cx="100" cy="100" r="40" fill="hsl(var(--card))" />
-        <text x="100" y="100" textAnchor="middle" dominantBaseline="middle" className="text-2xl font-bold fill-current">
-          {total}
-        </text>
-        <text x="100" y="120" textAnchor="middle" dominantBaseline="middle" className="text-xs fill-muted-foreground">
-          قضية
-        </text>
-      </svg>
-      <div className="space-y-2">
-        {segments.map((segment, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: segment.color }}
-            />
-            <span className="text-sm">{segment.label}</span>
-            <span className="text-sm font-bold mr-auto">{segment.count}</span>
-            <span className="text-xs text-muted-foreground">({segment.percentage.toFixed(1)}%)</span>
-          </div>
-        ))}
-      </div>
-    </div>
+    <motion.div
+      variants={itemVariants}
+      initial="hidden"
+      animate="visible"
+      transition={{ delay }}
+    >
+      <motion.div
+        variants={cardHoverVariants}
+        initial="rest"
+        whileHover="hover"
+        className="h-full"
+      >
+        <Card className="card-hover border-none shadow-soft overflow-hidden h-full">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <motion.div 
+                className={`p-2.5 rounded-xl ${iconBg}`}
+                whileHover={{ rotate: 10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Icon className="h-5 w-5 text-foreground" />
+              </motion.div>
+              <TrendingUp className="h-4 w-4 text-muted-foreground/50" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold tracking-tight">
+              <AnimatedNumber value={value} isCurrency={isCurrency} />
+            </p>
+            <CardTitle className="text-base font-semibold mt-1">{title}</CardTitle>
+            <CardDescription className="text-xs mt-0.5">{description}</CardDescription>
+          </CardContent>
+          <div className={`h-1 w-full bg-gradient-to-l ${gradient}`} />
+        </Card>
+      </motion.div>
+    </motion.div>
   );
 }
 
-// رسم بياني شريطي بسيط
-function BarChart({ data }: { data: Array<{ month: string; count: number }> }) {
-  const maxCount = Math.max(...data.map(d => d.count), 1);
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-end justify-between gap-2 h-32">
-        {data.map((item, index) => (
-          <div key={index} className="flex-1 flex flex-col items-center gap-1">
-            <div 
-              className="w-full bg-primary/80 rounded-t transition-all duration-500"
-              style={{ 
-                height: `${(item.count / maxCount) * 100}%`,
-                minHeight: item.count > 0 ? '4px' : '0px',
-                animationDelay: `${index * 100}ms`
-              }}
-            />
-            <span className="text-xs text-muted-foreground">{item.month}</span>
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
-        {data.map((item, index) => (
-          <div key={index} className="text-center">
-            <span className="font-medium text-foreground">{item.count}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+// ==================== Activity Icon ====================
+function getActivityIcon(action: string | null) {
+  switch (action) {
+    case 'case_created':
+      return <FileText className="h-4 w-4 text-blue-500" />;
+    case 'case_updated':
+      return <Briefcase className="h-4 w-4 text-amber-500" />;
+    case 'case_deleted':
+      return <XCircle className="h-4 w-4 text-red-500" />;
+    case 'client_created':
+      return <Users className="h-4 w-4 text-green-500" />;
+    case 'session_created':
+      return <Calendar className="h-4 w-4 text-purple-500" />;
+    case 'login':
+      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+    default:
+      return <Activity className="h-4 w-4 text-gray-500" />;
+  }
 }
 
+// ==================== Session Alert Badge ====================
+function getSessionAlertBadge(sessionDate: number | null) {
+  if (!sessionDate) return null;
+  
+  const now = new Date();
+  const session = new Date(sessionDate);
+  const diffDays = Math.ceil((session.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays <= 1) {
+    return (
+      <Badge variant="destructive" className="ml-2 animate-pulse">
+        <AlertCircle className="h-3 w-3 ml-1" />
+        عاجل
+      </Badge>
+    );
+  } else if (diffDays <= 3) {
+    return (
+      <Badge variant="outline" className="ml-2 border-amber-500 text-amber-600">
+        <Bell className="h-3 w-3 ml-1" />
+        قريب
+      </Badge>
+    );
+  }
+  return null;
+}
+
+// ==================== Status Icon ====================
+function getStatusIcon(status: string | null) {
+  switch (status) {
+    case 'active':
+      return <CheckCircle2 className="h-4 w-4 text-blue-500" />;
+    case 'adjourned':
+      return <PauseCircle className="h-4 w-4 text-amber-500" />;
+    case 'judged':
+      return <Scale className="h-4 w-4 text-green-500" />;
+    case 'closed':
+      return <XCircle className="h-4 w-4 text-gray-500" />;
+    case 'archived':
+      return <Archive className="h-4 w-4 text-purple-500" />;
+    default:
+      return <Briefcase className="h-4 w-4 text-gray-500" />;
+  }
+}
+
+// ==================== Main Dashboard Component ====================
 export function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -220,12 +331,42 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        >
+          <Loader2 className="h-8 w-8 text-primary" />
+        </motion.div>
       </div>
     );
   }
 
-  const cards = [
+  // تنسيق التاريخ
+  const formatDate = (timestamp: number | null) => {
+    if (!timestamp) return 'غير محدد';
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('ar-DZ', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatShortDate = (timestamp: number | null) => {
+    if (!timestamp) return 'غير محدد';
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('ar-DZ', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // البطاقات الرئيسية
+  const mainCards = [
     {
       title: 'القضايا النشطة',
       description: 'إجمالي القضايا الجارية',
@@ -261,27 +402,27 @@ export function Dashboard() {
     },
   ];
 
-  // تنسيق التاريخ
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('ar-DZ', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   return (
-    <div className="space-y-6 animate-fade-in">
+    <motion.div 
+      className="space-y-6"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {/* Welcome Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-primary to-primary/80 p-6 md:p-8 text-primary-foreground shadow-lg">
+      <motion.div 
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-primary to-primary/80 p-6 md:p-8 text-primary-foreground shadow-lg"
+        variants={itemVariants}
+      >
         <div className="relative z-10">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+            <motion.div 
+              className="p-3 bg-white/20 rounded-xl backdrop-blur-sm"
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              transition={{ duration: 0.2 }}
+            >
               <Scale className="h-8 w-8" />
-            </div>
+            </motion.div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold">مرحباً بك في مكتب المحامي</h1>
               <p className="mt-1 text-primary-foreground/80">
@@ -293,185 +434,437 @@ export function Dashboard() {
         {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-64 h-64 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-48 h-48 bg-white/5 rounded-full translate-x-1/4 translate-y-1/4" />
-      </div>
+      </motion.div>
       
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card, index) => (
-          <Card 
+      <motion.div 
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+        variants={containerVariants}
+      >
+        {mainCards.map((card, index) => (
+          <StatsCard 
             key={card.title} 
-            className="card-hover border-none shadow-soft overflow-hidden"
-            style={{ animationDelay: `${index * 100}ms` }}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className={`p-2.5 rounded-xl ${card.iconBg}`}>
-                  <card.icon className="h-5 w-5 text-foreground" />
-                </div>
-                <TrendingUp className="h-4 w-4 text-muted-foreground/50" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold tracking-tight">
-                {card.isCurrency ? (
-                  <>
-                    <AnimatedNumber value={card.value} />
-                    <span className="text-lg mr-1">د.ج</span>
-                  </>
-                ) : (
-                  <AnimatedNumber value={card.value} />
-                )}
-              </p>
-              <CardTitle className="text-base font-semibold mt-1">{card.title}</CardTitle>
-              <CardDescription className="text-xs mt-0.5">{card.description}</CardDescription>
-            </CardContent>
-            {/* Gradient accent line */}
-            <div className={`h-1 w-full bg-gradient-to-l ${card.gradient}`} />
-          </Card>
+            {...card} 
+            delay={index * 0.1}
+          />
         ))}
-      </div>
+      </motion.div>
+
+      {/* Additional Stats Row */}
+      <motion.div 
+        className="grid gap-4 md:grid-cols-3"
+        variants={containerVariants}
+      >
+        <motion.div variants={itemVariants}>
+          <Card className="border-none shadow-soft">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-red-500/20">
+                  <Receipt className="h-5 w-5 text-red-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">إجمالي المصروفات</p>
+                  <p className="text-xl font-bold">
+                    <AnimatedNumber value={stats?.totalExpenses || 0} isCurrency />
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <Card className="border-none shadow-soft">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-cyan-500/20">
+                  <Users className="h-5 w-5 text-cyan-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">إجمالي الموكلين</p>
+                  <p className="text-xl font-bold">
+                    <AnimatedNumber value={stats?.totalClients || 0} />
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <Card className="border-none shadow-soft">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-teal-500/20">
+                  <Building2 className="h-5 w-5 text-teal-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">الهيئات القضائية</p>
+                  <p className="text-xl font-bold">
+                    <AnimatedNumber value={stats?.totalJudicialBodies || 0} />
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
 
       {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <motion.div 
+        className="grid gap-6 lg:grid-cols-2"
+        variants={containerVariants}
+      >
         {/* Pie Chart - Cases by Status */}
-        <Card className="card-hover">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-primary" />
-              توزيع القضايا حسب الحالة
-            </CardTitle>
-            <CardDescription>نسبة القضايا في كل حالة</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <PieChart data={stats?.casesByStatus || []} />
-          </CardContent>
-        </Card>
+        <motion.div variants={itemVariants}>
+          <Card className="card-hover h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary" />
+                توزيع القضايا حسب الحالة
+              </CardTitle>
+              <CardDescription>نسبة القضايا في كل حالة</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stats?.casesByStatus && stats.casesByStatus.length > 0 ? (
+                <div className="flex flex-col lg:flex-row items-center gap-4">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={stats.casesByStatus}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="count"
+                        nameKey="label"
+                        animationBegin={0}
+                        animationDuration={1000}
+                      >
+                        {stats.casesByStatus.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {stats.casesByStatus.map((item, index) => (
+                      <motion.div 
+                        key={index} 
+                        className="flex items-center gap-2"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span>{item.label}</span>
+                        <span className="font-bold mr-auto">{item.count}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-48 text-muted-foreground">
+                  لا توجد بيانات
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        {/* Bar Chart - Monthly Sessions */}
+        {/* Pie Chart - Cases by Type */}
+        <motion.div variants={itemVariants}>
+          <Card className="card-hover h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                توزيع القضايا حسب النوع
+              </CardTitle>
+              <CardDescription>أنواع القضايا المتداولة</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stats?.casesByType && stats.casesByType.length > 0 ? (
+                <div className="flex flex-col lg:flex-row items-center gap-4">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={stats.casesByType}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="count"
+                        nameKey="label"
+                        animationBegin={0}
+                        animationDuration={1000}
+                      >
+                        {stats.casesByType.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="grid grid-cols-2 gap-2 text-sm max-h-40 overflow-y-auto">
+                    {stats.casesByType.map((item, index) => (
+                      <motion.div 
+                        key={index} 
+                        className="flex items-center gap-2"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="truncate">{item.label}</span>
+                        <span className="font-bold mr-auto">{item.count}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-48 text-muted-foreground">
+                  لا توجد بيانات
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+
+      {/* Monthly Stats Chart */}
+      <motion.div variants={itemVariants}>
         <Card className="card-hover">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-primary" />
-              الجلسات الشهرية
+              <TrendingUp className="h-5 w-5 text-primary" />
+              الإحصائيات الشهرية
             </CardTitle>
-            <CardDescription>عدد الجلسات في آخر 6 أشهر</CardDescription>
+            <CardDescription>القضايا والجلسات في آخر 6 أشهر</CardDescription>
           </CardHeader>
           <CardContent>
-            <BarChart data={stats?.monthlySessions || []} />
+            {stats?.monthlyStats && stats.monthlyStats.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={stats.monthlyStats}>
+                  <defs>
+                    <linearGradient id="colorCases" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorSessions" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="month" 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <YAxis 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="cases"
+                    name="القضايا"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorCases)"
+                    animationDuration={1500}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sessions"
+                    name="الجلسات"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorSessions)"
+                    animationDuration={1500}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-muted-foreground">
+                لا توجد بيانات
+              </div>
+            )}
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
 
       {/* Bottom Row */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <motion.div 
+        className="grid gap-6 lg:grid-cols-3"
+        variants={containerVariants}
+      >
+        {/* Upcoming Sessions with Alert */}
+        <motion.div variants={itemVariants}>
+          <Card className="card-hover h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className="relative">
+                  <Bell className="h-5 w-5 text-primary" />
+                  {stats?.upcomingSessions && stats.upcomingSessions.length > 0 && (
+                    <motion.span 
+                      className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                    />
+                  )}
+                </div>
+                الجلسات القادمة
+              </CardTitle>
+              <CardDescription>خلال الأيام السبعة القادمة</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AnimatePresence>
+                {stats?.upcomingSessions && stats.upcomingSessions.length > 0 ? (
+                  <div className="space-y-3 max-h-72 overflow-y-auto">
+                    {stats.upcomingSessions.map((session, index) => (
+                      <motion.a
+                        key={session.id || index}
+                        href={`/?section=sessions`}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ x: 5 }}
+                      >
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Calendar className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center">
+                            <p className="font-medium truncate text-sm">
+                              {session.caseNumber || 'بدون رقم'}
+                            </p>
+                            {getSessionAlertBadge(session.sessionDate)}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {formatShortDate(session.sessionDate)}
+                          </p>
+                        </div>
+                      </motion.a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                    <Calendar className="h-10 w-10 mb-2 opacity-50" />
+                    <p className="text-sm">لا توجد جلسات قادمة</p>
+                  </div>
+                )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Recent Cases */}
-        <Card className="card-hover">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              آخر القضايا
-            </CardTitle>
-            <CardDescription>أحدث القضايا المضافة</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats?.recentCases && stats.recentCases.length > 0 ? (
-              <div className="space-y-3">
-                {stats.recentCases.map((caseItem, index) => (
-                  <a
-                    key={caseItem.id || index}
-                    href={`/?section=cases`}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Briefcase className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm">
-                        {caseItem.caseNumber || 'بدون رقم'}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {caseItem.subject || 'بدون موضوع'}
-                      </p>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                <Briefcase className="h-10 w-10 mb-2 opacity-50" />
-                <p className="text-sm">لا توجد قضايا</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <motion.div variants={itemVariants}>
+          <Card className="card-hover h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                آخر القضايا
+              </CardTitle>
+              <CardDescription>أحدث القضايا المضافة</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stats?.recentCases && stats.recentCases.length > 0 ? (
+                <div className="space-y-3 max-h-72 overflow-y-auto">
+                  {stats.recentCases.map((caseItem, index) => (
+                    <motion.a
+                      key={caseItem.id || index}
+                      href={`/?section=cases`}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ x: 5 }}
+                    >
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        {getStatusIcon(caseItem.status)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate text-sm">
+                          {caseItem.caseNumber || 'بدون رقم'}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {caseItem.subject || 'بدون موضوع'}
+                        </p>
+                      </div>
+                    </motion.a>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                  <Briefcase className="h-10 w-10 mb-2 opacity-50" />
+                  <p className="text-sm">لا توجد قضايا</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        {/* Quick Stats */}
-        <Card className="card-hover">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              إحصائيات إضافية
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-blue-500" />
-                <span>الموكلين</span>
-              </div>
-              <span className="font-bold text-lg">{stats?.totalClients || 0}</span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Building2 className="h-5 w-5 text-emerald-500" />
-                <span>الهيئات القضائية</span>
-              </div>
-              <span className="font-bold text-lg">{stats?.totalJudicialBodies || 0}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Upcoming Sessions */}
-        <Card className="card-hover">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              الجلسات القادمة
-            </CardTitle>
-            <CardDescription>أقرب الجلسات المجدولة</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats?.upcomingSessions && stats.upcomingSessions.length > 0 ? (
-              <div className="space-y-3">
-                {stats.upcomingSessions.slice(0, 4).map((session, index) => (
-                  <a
-                    key={session.id || index}
-                    href={`/?section=sessions`}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Calendar className="h-4 w-4 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm">
-                        {session.case_number || 'بدون رقم'}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {formatDate(session.session_date)}
-                      </p>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                <Calendar className="h-10 w-10 mb-2 opacity-50" />
-                <p className="text-sm">لا توجد جلسات قادمة</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        {/* Recent Activities */}
+        <motion.div variants={itemVariants}>
+          <Card className="card-hover h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-primary" />
+                آخر النشاطات
+              </CardTitle>
+              <CardDescription>سجل أحدث العمليات</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stats?.recentActivities && stats.recentActivities.length > 0 ? (
+                <div className="space-y-3 max-h-72 overflow-y-auto">
+                  {stats.recentActivities.map((activity, index) => (
+                    <motion.div
+                      key={activity.id || index}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <div className="p-2 bg-muted rounded-lg">
+                        {getActivityIcon(activity.action)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">
+                          {activity.description || 'نشاط غير محدد'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatShortDate(activity.createdAt ? new Date(activity.createdAt).getTime() : null)}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                  <Activity className="h-10 w-10 mb-2 opacity-50" />
+                  <p className="text-sm">لا توجد نشاطات</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }
