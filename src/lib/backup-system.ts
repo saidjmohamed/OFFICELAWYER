@@ -779,7 +779,7 @@ export async function decryptData(encryptedData: Buffer, password: string): Prom
 
 // ==================== التصدير الافتراضي ====================
 
-export default {
+const backupSystem = {
   createBackup,
   previewBackup,
   restoreBackup,
@@ -792,3 +792,5 @@ export default {
   ensureDirectories,
   BACKUP_CONFIG,
 };
+
+export default backupSystem;

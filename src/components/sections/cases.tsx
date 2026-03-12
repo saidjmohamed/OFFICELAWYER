@@ -310,6 +310,8 @@ export function CasesSection() {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [fileUploadForm, setFileUploadForm] = useState({
     customName: '',
+    fileType: 'document',
+    description: '',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
