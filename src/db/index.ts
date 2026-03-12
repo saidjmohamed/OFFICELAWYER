@@ -116,3 +116,17 @@ export const sqlite = {
     return initDb().client.execute(`PRAGMA ${pragma}`);
   }
 };
+
+// إعادة تعيين الاتصال (للاستخدام بعد استرجاع النسخة الاحتياطية)
+export function resetDbConnection() {
+  try {
+    if (_client) {
+      _client.close();
+    }
+  } catch {
+    // تجاهل أخطاء الإغلاق
+  }
+  _client = null;
+  _dbInstance = null;
+  console.log('🔄 تم إعادة تعيين اتصال قاعدة البيانات');
+}

@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
     const description = formData.get('description') as string;
     const file = formData.get('file') as File;
 
-    if (!caseId || !fileType || !file) {
-      return NextResponse.json({ error: 'جميع الحقول المطلوبة يجب ملؤها' }, { status: 400 });
+    if (!caseId || !file) {
+      return NextResponse.json({ error: 'معرف القضية والملف مطلوبان' }, { status: 400 });
     }
 
     // إنشاء اسم فريد للملف
@@ -95,12 +95,11 @@ export async function POST(request: NextRequest) {
       caseId: parseInt(caseId as string),
       fileName,
       originalName: file.name,
-      fileType: fileType as 'subject' | 'judgment' | 'decision' | 'other',
+      filePath,
+      fileType: (fileType || 'other') as 'subject' | 'judgment' | 'decision' | 'other',
       mimeType: file.type,
       fileSize: file.size,
-      description,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      description: description || null,
     }).returning();
 
     return NextResponse.json(result[0]);

@@ -186,6 +186,20 @@ interface Case {
   chamberId?: number;
   wilayaId?: number;
   notes?: string | null;
+  parties?: CasePartySummary[];
+  plaintiffs?: CasePartySummary[];
+  defendants?: CasePartySummary[];
+}
+
+// ملخص طرف القضية للعرض في القائمة
+interface CasePartySummary {
+  caseId: number;
+  role: 'plaintiff' | 'defendant';
+  clientName: string | null;
+  clientDescription: string | null;
+  opponentFirstName: string | null;
+  opponentLastName: string | null;
+  description: string | null;
 }
 
 interface JudicialBody {
@@ -1592,62 +1606,105 @@ export function CasesSection() {
               </div>
               <div className="p-4">
                 <div className="grid gap-3">
-                  {bodyCases.map((caseItem) => (
-                    <div
-                      key={caseItem.id}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-                      onClick={() => openDetailsDialog(caseItem)}
-                    >
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-primary">{caseItem.caseNumber || 'بدون رقم'}</span>
-                          <span className="text-sm text-muted-foreground truncate max-w-[200px]">
-                            {caseItem.subject || 'بدون موضوع'}
-                          </span>
+                  {bodyCases.map((caseItem) => {
+                    // تنسيق أسماء الأطراف
+                    const getPartyNames = (role: 'plaintiff' | 'defendant') => {
+                      const partyList = role === 'plaintiff' ? caseItem.plaintiffs : caseItem.defendants;
+                      if (!partyList || partyList.length === 0) return null;
+                      
+                      return partyList.map(p => {
+                        if (p.clientName) {
+                          return p.clientDescription ? `${p.clientName} (${p.clientDescription})` : p.clientName;
+                        }
+                        const opponentName = [p.opponentFirstName, p.opponentLastName].filter(Boolean).join(' ');
+                        return opponentName || null;
+                      }).filter(Boolean).join('، ');
+                    };
+                    
+                    const plaintiffs = getPartyNames('plaintiff');
+                    const defendants = getPartyNames('defendant');
+                    
+                    return (
+                      <div
+                        key={caseItem.id}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                        onClick={() => openDetailsDialog(caseItem)}
+                      >
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className="flex flex-col min-w-[120px]">
+                            <span className="font-medium text-primary">{caseItem.caseNumber || 'بدون رقم'}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {CASE_TYPE_LABELS[caseItem.caseType] || caseItem.caseType || '-'}
+                            </span>
+                          </div>
+                          
+                          <Separator orientation="vertical" className="h-12" />
+                          
+                          {/* الأطراف */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col gap-1">
+                              {plaintiffs && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs shrink-0">
+                                    المدعي
+                                  </Badge>
+                                  <span className="truncate font-medium">{plaintiffs}</span>
+                                </div>
+                              )}
+                              {defendants && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs shrink-0">
+                                    المدعى عليه
+                                  </Badge>
+                                  <span className="truncate font-medium">{defendants}</span>
+                                </div>
+                              )}
+                              {!plaintiffs && !defendants && caseItem.subject && (
+                                <span className="text-sm text-muted-foreground truncate">
+                                  {caseItem.subject}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <Separator orientation="vertical" className="h-12" />
+                          
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs text-muted-foreground">الأتعاب</span>
+                            <span className="text-sm font-medium">
+                              {caseItem.fees ? `${caseItem.fees.toLocaleString('ar-DZ')} د.ج` : '-'}
+                            </span>
+                          </div>
                         </div>
-                        <Separator orientation="vertical" className="h-10" />
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">النوع</span>
-                          <span className="text-sm font-medium">
-                            {CASE_TYPE_LABELS[caseItem.caseType] || caseItem.caseType || '-'}
-                          </span>
-                        </div>
-                        <Separator orientation="vertical" className="h-10" />
-                        <div className="flex flex-col">
-                          <span className="text-sm text-muted-foreground">الأتعاب</span>
-                          <span className="text-sm font-medium">
-                            {caseItem.fees ? `${caseItem.fees.toLocaleString('ar-DZ')} د.ج` : '-'}
-                          </span>
+                        <div className="flex items-center gap-2">
+                          <Badge className={statusColors[caseItem.status]}>
+                            {statusLabels[caseItem.status]}
+                          </Badge>
+                          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(caseItem)}
+                              title="تعديل"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedCase(caseItem);
+                                setDeleteDialogOpen(true);
+                              }}
+                              title="حذف"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={statusColors[caseItem.status]}>
-                          {statusLabels[caseItem.status]}
-                        </Badge>
-                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(caseItem)}
-                            title="تعديل"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedCase(caseItem);
-                              setDeleteDialogOpen(true);
-                            }}
-                            title="حذف"
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </Card>

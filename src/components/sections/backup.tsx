@@ -106,6 +106,10 @@ interface BackupPreview {
   compatible: boolean;
   compatibilityWarnings: string[];
   filesCount: number;
+  // معلومات الترقية
+  needsMigration: boolean;
+  migrationSteps: string[];
+  canAutoMigrate: boolean;
 }
 
 interface BackupInfo {
@@ -790,10 +794,57 @@ export function BackupSection() {
                 {preview.compatibilityWarnings.length > 0 && (
                   <div className="mt-2 text-sm">
                     {preview.compatibilityWarnings.map((warning, i) => (
-                      <p key={i}>⚠️ {warning}</p>
+                      <p key={i} className={warning.startsWith('⚠️') ? 'text-amber-600' : warning.startsWith('📋') ? 'text-blue-600' : ''}>
+                        {warning}
+                      </p>
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* معلومات الترقية */}
+              {preview.needsMigration && preview.canAutoMigrate && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <RefreshCw className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-blue-800 dark:text-blue-200">
+                      سيتم ترقية قاعدة البيانات تلقائياً
+                    </span>
+                  </div>
+                  <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                    {preview.migrationSteps.map((step, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Hash className="h-3 w-3" />
+                        <span>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* معلومات الإصدار */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">إصدار قاعدة البيانات</span>
+                  </div>
+                  <p className="font-medium">
+                    {preview.version.database_schema_version || 1}
+                    {preview.needsMigration && (
+                      <span className="text-blue-600 text-sm mr-1">
+                        → {preview.version.database_schema_version + (preview.migrationSteps.length || 0)}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">تنسيق النسخة</span>
+                  </div>
+                  <p className="font-medium">{preview.version.backup_format_version || '1.0'}</p>
+                </div>
               </div>
 
               {/* معلومات أساسية */}

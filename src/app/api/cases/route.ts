@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { cases, caseClients, clients, judicialBodies, chambers, wilayas, lawyers, organizations } from '@/db/schema';
-import { eq, ilike, or, sql, desc, and } from 'drizzle-orm';
+import { eq, ilike, or, sql, desc, and, inArray } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
@@ -104,10 +104,44 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
+    // جلب أطراف القضايا لكل قضية
+    const caseIds = caseList.map(c => c.id);
+    let partiesByCase: Record<number, any[]> = {};
+    
+    if (caseIds.length > 0) {
+      const allParties = await db.select({
+        caseId: caseClients.caseId,
+        role: caseClients.role,
+        clientName: clients.fullName,
+        clientDescription: caseClients.clientDescription,
+        opponentFirstName: caseClients.opponentFirstName,
+        opponentLastName: caseClients.opponentLastName,
+        description: caseClients.description,
+      })
+        .from(caseClients)
+        .leftJoin(clients, eq(caseClients.clientId, clients.id))
+        .where(inArray(caseClients.caseId, caseIds));
+      
+      for (const party of allParties) {
+        if (!partiesByCase[party.caseId]) {
+          partiesByCase[party.caseId] = [];
+        }
+        partiesByCase[party.caseId].push(party);
+      }
+    }
+
+    // إضافة الأطراف لكل قضية
+    const casesWithParties = caseList.map(c => ({
+      ...c,
+      parties: partiesByCase[c.id] || [],
+      plaintiffs: (partiesByCase[c.id] || []).filter(p => p.role === 'plaintiff'),
+      defendants: (partiesByCase[c.id] || []).filter(p => p.role === 'defendant'),
+    }));
+
     const countResult = await db.select({ count: sql<number>`count(*)` }).from(cases);
     const total = countResult[0]?.count || 0;
 
-    return NextResponse.json({ data: caseList, total, page, limit });
+    return NextResponse.json({ data: casesWithParties, total, page, limit });
   } catch (error) {
     console.error('خطأ في جلب القضايا:', error);
     return NextResponse.json({ error: 'حدث خطأ' }, { status: 500 });

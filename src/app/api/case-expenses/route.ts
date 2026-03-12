@@ -47,9 +47,7 @@ export async function POST(request: NextRequest) {
       description,
       amount: parseFloat(amount),
       expenseDate: expenseDate ? new Date(expenseDate) : null,
-      notes,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      notes: notes || null,
     }).returning();
 
     return NextResponse.json(result[0]);
@@ -74,8 +72,7 @@ export async function PUT(request: NextRequest) {
         description,
         amount: parseFloat(amount),
         expenseDate: expenseDate ? new Date(expenseDate) : null,
-        notes,
-        updatedAt: new Date(),
+        notes: notes || null,
       })
       .where(eq(caseExpenses.id, parseInt(id)))
       .returning();

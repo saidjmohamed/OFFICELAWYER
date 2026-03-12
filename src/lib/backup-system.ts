@@ -18,6 +18,7 @@ import AdmZip from 'adm-zip';
 import { db } from '@/db';
 import { sqlite } from '@/db';
 import * as schema from '@/db/schema';
+import { DATABASE_SCHEMA_VERSION } from '@/db/schema';
 import { sql } from 'drizzle-orm';
 import { hostname, platform, arch } from 'os';
 import { version } from '../../package.json';
@@ -26,9 +27,9 @@ import { version } from '../../package.json';
 
 export const BACKUP_CONFIG = {
   // إصدار تنسيق النسخة الاحتياطية
-  FORMAT_VERSION: '2.0',
-  // إصدار مخطط قاعدة البيانات
-  SCHEMA_VERSION: 1,
+  FORMAT_VERSION: '2.1',
+  // إصدار مخطط قاعدة البيانات (من schema.ts)
+  get SCHEMA_VERSION() { return DATABASE_SCHEMA_VERSION; },
   // عدد النسخ التلقائية القصوى
   MAX_AUTO_BACKUPS: 10,
   // الحد الأقصى لحجم الملف (50 MB)
@@ -132,6 +133,10 @@ export interface BackupPreview {
   compatible: boolean;
   compatibilityWarnings: string[];
   filesCount: number;
+  // معلومات الترقية
+  needsMigration: boolean;
+  migrationSteps: string[];
+  canAutoMigrate: boolean;
 }
 
 export interface BackupInfo {
@@ -455,6 +460,9 @@ export async function previewBackup(zipBuffer: Buffer): Promise<BackupPreview> {
         compatible: false,
         compatibilityWarnings: [`ملفات مفقودة: ${missingFiles.join(', ')}`],
         filesCount: 0,
+        needsMigration: false,
+        migrationSteps: [],
+        canAutoMigrate: false,
       };
     }
 
@@ -479,6 +487,9 @@ export async function previewBackup(zipBuffer: Buffer): Promise<BackupPreview> {
         compatible: false,
         compatibilityWarnings: ['فشل في قراءة قاعدة البيانات'],
         filesCount: 0,
+        needsMigration: false,
+        migrationSteps: [],
+        canAutoMigrate: false,
       };
     }
 
@@ -513,14 +524,38 @@ export async function previewBackup(zipBuffer: Buffer): Promise<BackupPreview> {
 
     // التحقق من التوافق
     const compatibilityWarnings: string[] = [];
-    const currentAppVersion = getAppVersion();
+    const migrationSteps: string[] = [];
+    let needsMigration = false;
+    let canAutoMigrate = true;
+    
+    const currentSchemaVersion = BACKUP_CONFIG.SCHEMA_VERSION;
+    const backupSchemaVersion = version.database_schema_version || 1; // الافتراضي 1 للنسخ القديمة
 
-    if (version.database_schema_version > BACKUP_CONFIG.SCHEMA_VERSION) {
-      compatibilityWarnings.push('إصدار قاعدة البيانات أحدث من الإصدار الحالي');
+    // التحقق من إصدار قاعدة البيانات
+    if (backupSchemaVersion > currentSchemaVersion) {
+      // النسخة الاحتياطية أحدث - لا يمكن الترقية
+      compatibilityWarnings.push(`⚠️ النسخة الاحتياطية من إصدار أحدث (${backupSchemaVersion}) ولا يمكن استرجاعها على الإصدار الحالي (${currentSchemaVersion})`);
+      canAutoMigrate = false;
+    } else if (backupSchemaVersion < currentSchemaVersion) {
+      // النسخة الاحتياطية أقدم - تحتاج ترقية
+      needsMigration = true;
+      compatibilityWarnings.push(`📋 النسخة الاحتياطية من إصدار أقدم (${backupSchemaVersion}) وستتم ترقيته تلقائياً إلى (${currentSchemaVersion})`);
+      
+      // تحديد خطوات الترقية
+      for (let v = backupSchemaVersion + 1; v <= currentSchemaVersion; v++) {
+        switch (v) {
+          case 2:
+            migrationSteps.push(`الترقية إلى الإصدار 2: إضافة نظام تتبع الإصدارات`);
+            break;
+          // أضف خطوات الترقية المستقبلية هنا
+          default:
+            migrationSteps.push(`الترقية إلى الإصدار ${v}`);
+        }
+      }
     }
 
     if (version.backup_format_version !== BACKUP_CONFIG.FORMAT_VERSION) {
-      compatibilityWarnings.push('إصدار تنسيق النسخة الاحتياطية مختلف');
+      compatibilityWarnings.push('ℹ️ إصدار تنسيق النسخة الاحتياطية مختلف (يمكن الاسترجاع)');
     }
 
     // عدد الملفات
@@ -532,9 +567,12 @@ export async function previewBackup(zipBuffer: Buffer): Promise<BackupPreview> {
       version,
       checksum,
       integrityCheck,
-      compatible: compatibilityWarnings.length === 0,
+      compatible: canAutoMigrate,
       compatibilityWarnings,
       filesCount,
+      needsMigration,
+      migrationSteps,
+      canAutoMigrate,
     };
   } catch (error) {
     return {
@@ -546,6 +584,9 @@ export async function previewBackup(zipBuffer: Buffer): Promise<BackupPreview> {
       compatible: false,
       compatibilityWarnings: [error instanceof Error ? error.message : 'خطأ في قراءة الملف'],
       filesCount: 0,
+      needsMigration: false,
+      migrationSteps: [],
+      canAutoMigrate: false,
     };
   }
 }
@@ -553,7 +594,7 @@ export async function previewBackup(zipBuffer: Buffer): Promise<BackupPreview> {
 // ==================== استرجاع النسخة الاحتياطية ====================
 
 /**
- * استرجاع نسخة احتياطية
+ * استرجاع نسخة احتياطية مع ترقية تلقائية
  */
 export async function restoreBackup(zipBuffer: Buffer): Promise<RestoreResult> {
   try {
@@ -566,6 +607,15 @@ export async function restoreBackup(zipBuffer: Buffer): Promise<RestoreResult> {
         message: 'النسخة الاحتياطية غير صالحة',
         integrityCheck: preview.integrityCheck,
         error: preview.compatibilityWarnings.join(', '),
+      };
+    }
+
+    // التحقق من إمكانية الترقية
+    if (!preview.canAutoMigrate) {
+      return {
+        success: false,
+        message: 'لا يمكن استرجاع النسخة الاحتياطية',
+        error: preview.compatibilityWarnings.join('\n'),
       };
     }
 
@@ -601,6 +651,22 @@ export async function restoreBackup(zipBuffer: Buffer): Promise<RestoreResult> {
     // كتابة قاعدة البيانات الجديدة
     await writeFile(BACKUP_CONFIG.PATHS.DB_FILE, dbBuffer);
 
+    // الترقية التلقائية إذا لزم الأمر
+    let migrationMessage = '';
+    if (preview.needsMigration) {
+      console.log('🔄 بدء الترقية التلقائية للنسخة المسترجعة...');
+      try {
+        const { runMigrationsOnRestoredDb } = await import('@/db/init');
+        await runMigrationsOnRestoredDb?.();
+        migrationMessage = ` (تمت الترقية من الإصدار ${preview.version.database_schema_version} إلى ${DATABASE_SCHEMA_VERSION})`;
+        console.log('✅ تمت الترقية التلقائية بنجاح');
+      } catch (migrationError) {
+        console.error('⚠️ فشلت الترقية التلقائية:', migrationError);
+        // لا نفشل الاسترجاع بالكامل، لكن نحذر المستخدم
+        migrationMessage = ' (تحذير: فشلت الترقية التلقائية - قد تحتاج لتحديث قاعدة البيانات يدوياً)';
+      }
+    }
+
     // استخراج الملفات
     let filesRestored = 0;
     const entries = zip.getEntries();
@@ -629,7 +695,7 @@ export async function restoreBackup(zipBuffer: Buffer): Promise<RestoreResult> {
 
     return {
       success: true,
-      message: 'تم استعادة النسخة الاحتياطية بنجاح',
+      message: `تم استعادة النسخة الاحتياطية بنجاح${migrationMessage}`,
       restoredMetadata: preview.metadata,
       integrityCheck: preview.integrityCheck,
       autoBackupPath,

@@ -1,7 +1,8 @@
 import { getClient, db } from './index';
 import * as schema from './schema';
+import { DATABASE_SCHEMA_VERSION } from './schema';
 import { algerianWilayas } from './seed-data';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 // دالة آمنة لتنفيذ SQL باستخدام libSQL
 async function safeExec(sql: string, description?: string) {
@@ -21,6 +22,82 @@ async function safeExec(sql: string, description?: string) {
     console.error(`❌ خطأ في: ${description || sql.substring(0, 50)}`, error);
     return false;
   }
+}
+
+// الحصول على إصدار قاعدة البيانات الحالي
+export async function getDatabaseSchemaVersion(): Promise<number> {
+  try {
+    const client = getClient();
+    // التحقق من وجود جدول schema_migrations
+    const tableCheck = await client.execute(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'"
+    );
+    
+    if (tableCheck.rows.length === 0) {
+      return 0; // لا يوجد جدول، إذن الإصدار 0
+    }
+    
+    const result = await client.execute(
+      'SELECT MAX(version) as version FROM schema_migrations'
+    );
+    
+    return Number(result.rows[0]?.[0]) || 0;
+  } catch (error) {
+    console.error('خطأ في الحصول على إصدار قاعدة البيانات:', error);
+    return 0;
+  }
+}
+
+// تسجيل إصدار جديد
+async function recordMigration(version: number, description: string) {
+  try {
+    const client = getClient();
+    await client.execute(
+      `INSERT INTO schema_migrations (version, description, applied_at) VALUES (${version}, '${description.replace(/'/g, "''")}', ${Date.now()})`
+    );
+    console.log(`✅ تم تسجيل الترقية إلى الإصدار ${version}`);
+  } catch (error) {
+    console.error('خطأ في تسجيل الترقية:', error);
+  }
+}
+
+// تنفيذ الترقيات المعلقة
+async function runMigrations() {
+  const currentVersion = await getDatabaseSchemaVersion();
+  console.log(`📊 إصدار قاعدة البيانات الحالي: ${currentVersion}`);
+  console.log(`📊 إصدار التطبيق المطلوب: ${DATABASE_SCHEMA_VERSION}`);
+  
+  if (currentVersion >= DATABASE_SCHEMA_VERSION) {
+    console.log('✅ قاعدة البيانات محدثة');
+    return;
+  }
+  
+  // تنفيذ الترقيات من currentVersion + 1 إلى DATABASE_SCHEMA_VERSION
+  for (let version = currentVersion + 1; version <= DATABASE_SCHEMA_VERSION; version++) {
+    console.log(`🔄 تنفيذ الترقية إلى الإصدار ${version}...`);
+    
+    if (version === 1) {
+      // الإصدار الأولي - تسجيل أن قاعدة البيانات موجودة
+      await recordMigration(1, 'الإصدار الأولي من قاعدة البيانات');
+    } else if (version === 2) {
+      // جدول schema_migrations تم إنشاؤه في createTables
+      await recordMigration(2, 'إضافة نظام تتبع الإصدارات');
+    } else {
+      console.log(`⚠️ لا توجد ترقية للإصدار ${version}`);
+    }
+  }
+  
+  console.log(`✅ تم تحديث قاعدة البيانات إلى الإصدار ${DATABASE_SCHEMA_VERSION}`);
+}
+
+// تنفيذ الترقيات على قاعدة البيانات المسترجعة (للاستخدام من نظام النسخ الاحتياطي)
+export async function runMigrationsOnRestoredDb() {
+  // إعادة تعيين الاتصال لضمان استخدام القاعدة الجديدة
+  const { resetDbConnection } = await import('./index');
+  resetDbConnection?.();
+  
+  // تشغيل الترقيات
+  await runMigrations();
 }
 
 // دالة للحصول على معلومات الجدول
@@ -269,9 +346,20 @@ export async function createTables() {
       expense_date INTEGER,
       category TEXT,
       notes TEXT,
-      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+      created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),
+      updated_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
     )
   `, 'إنشاء جدول مصاريف القضايا');
+
+  // جدول تتبع الإصدارات
+  await safeExec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version INTEGER NOT NULL,
+      description TEXT,
+      applied_at INTEGER DEFAULT (strftime('%s', 'now') * 1000)
+    )
+  `, 'إنشاء جدول تتبع الإصدارات');
 
   // === التحقق من الهيكل وإضافة الأعمدة المفقودة ===
 
@@ -375,6 +463,62 @@ export async function createTables() {
     console.log('تحذير: لم نتمكن من تحديث هيكل جدول clients');
   }
 
+  // التحقق من هيكل جدول case_expenses
+  try {
+    const expenseColumnNames = await getTableInfo('case_expenses');
+    
+    if (!expenseColumnNames.includes('updated_at')) {
+      await safeExec('ALTER TABLE case_expenses ADD COLUMN updated_at INTEGER', 'إضافة عمود updated_at لمصروفات القضايا');
+    }
+  } catch (error) {
+    console.log('تحذير: لم نتمكن من تحديث هيكل جدول case_expenses');
+  }
+
+  // التحقق من هيكل جدول case_files
+  try {
+    const caseFilesColumnNames = await getTableInfo('case_files');
+    
+    if (!caseFilesColumnNames.includes('file_type')) {
+      await safeExec("ALTER TABLE case_files ADD COLUMN file_type TEXT CHECK(file_type IN ('subject', 'judgment', 'decision', 'other'))", 'إضافة عمود file_type لملفات القضايا');
+    }
+  } catch (error) {
+    console.log('تحذير: لم نتمكن من تحديث هيكل جدول case_files');
+  }
+
+  // إنشاء فهارس للبحث السريع
+  console.log('📊 إنشاء فهارس البحث...');
+  
+  // فهرس للموكلين
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_clients_fullname ON clients(full_name COLLATE NOCASE)`, 'فهرس أسماء الموكلين');
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone)`, 'فهرس هواتف الموكلين');
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_clients_business_name ON clients(business_name COLLATE NOCASE)`, 'فهرس أسماء الشركات');
+  
+  // فهرس للقضايا
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_cases_number ON cases(case_number)`, 'فهرس أرقام القضايا');
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status)`, 'فهرس حالة القضايا');
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_cases_judicial_body ON cases(judicial_body_id)`, 'فهرس الهيئات القضائية');
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_cases_subject ON cases(subject COLLATE NOCASE)`, 'فهرس موضوعات القضايا');
+  
+  // فهرس للمحامين
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_lawyers_name ON lawyers(first_name COLLATE NOCASE, last_name COLLATE NOCASE)`, 'فهرس أسماء المحامين');
+  
+  // فهرس للجلسات
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(session_date)`, 'فهرس تواريخ الجلسات');
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_sessions_case ON sessions(case_id)`, 'فهرس جلسات القضايا');
+  
+  // فهرس لأطراف القضايا
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_case_clients_case ON case_clients(case_id)`, 'فهرس أطراف القضايا');
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_case_clients_client ON case_clients(client_id)`, 'فهرس موكلي القضايا');
+  
+  // فهرس للهيئات القضائية
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_judicial_bodies_name ON judicial_bodies(name COLLATE NOCASE)`, 'فهرس أسماء الهيئات القضائية');
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_judicial_bodies_type ON judicial_bodies(type)`, 'فهرس أنواع الهيئات القضائية');
+  
+  // فهرس للمنظمات
+  await safeExec(`CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations(name COLLATE NOCASE)`, 'فهرس أسماء المنظمات');
+  
+  console.log('✅ تم إنشاء فهارس البحث');
+
   // إنشاء جدول activity_logs إذا لم يكن موجوداً
   await safeExec(`
     CREATE TABLE IF NOT EXISTS activity_logs (
@@ -426,6 +570,7 @@ export async function seedDatabase() {
 export async function initializeDatabase() {
   try {
     await createTables();
+    await runMigrations(); // تنفيذ الترقيات
     await seedDatabase();
     console.log('✅ تم تهيئة قاعدة البيانات بنجاح');
     return { success: true };

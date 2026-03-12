@@ -1,6 +1,10 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 
+// ==================== إصدار قاعدة البيانات ====================
+// يجب تحديث هذا الرقم عند أي تغيير في هيكل قاعدة البيانات
+export const DATABASE_SCHEMA_VERSION = 2;
+
 // الولايات الجزائرية
 export const wilayas = sqliteTable('wilayas', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -195,14 +199,14 @@ export const calendarEvents = sqliteTable('calendar_events', {
 export const caseFiles = sqliteTable('case_files', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   caseId: integer('case_id').references(() => cases.id, { onDelete: 'cascade' }).notNull(),
-  fileName: text('file_name').notNull(),
+  fileName: text('filename').notNull(), // استخدام اسم العمود الفعلي في قاعدة البيانات
   originalName: text('original_name').notNull(),
-  fileType: text('file_type', { enum: ['subject', 'judgment', 'decision', 'other'] }).notNull(),
+  filePath: text('filepath'), // مسار الملف على القرص
+  fileType: text('file_type', { enum: ['subject', 'judgment', 'decision', 'other'] }),
   mimeType: text('mime_type'),
-  fileSize: integer('file_size'),
+  fileSize: integer('size'), // استخدام اسم العمود الفعلي
   description: text('description'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
 // مصاريف القضية
@@ -212,9 +216,9 @@ export const caseExpenses = sqliteTable('case_expenses', {
   description: text('description').notNull(),
   amount: real('amount').notNull(),
   expenseDate: integer('expense_date', { mode: 'timestamp' }),
+  category: text('category'),
   notes: text('notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
 // سجل النشاطات
@@ -245,6 +249,14 @@ export const settings = sqliteTable('settings', {
   value: text('value'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+});
+
+// جدول تتبع إصدارات قاعدة البيانات
+export const schemaMigrations = sqliteTable('schema_migrations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  version: integer('version').notNull(),
+  appliedAt: integer('applied_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  description: text('description'),
 });
 
 // إعدادات المكتب (للتخصيص)
@@ -436,3 +448,5 @@ export type OfficeSetting = typeof officeSettings.$inferSelect;
 export type NewOfficeSetting = typeof officeSettings.$inferInsert;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type NewActivityLog = typeof activityLogs.$inferInsert;
+export type SchemaMigration = typeof schemaMigrations.$inferSelect;
+export type NewSchemaMigration = typeof schemaMigrations.$inferInsert;
