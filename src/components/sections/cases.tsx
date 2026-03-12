@@ -76,7 +76,8 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
-  Archive
+  Archive,
+  Users
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -1726,7 +1727,7 @@ export function CasesSection() {
               <TableRow>
                 <TableHead>رقم القضية</TableHead>
                 <TableHead>النوع</TableHead>
-                <TableHead>الموضوع</TableHead>
+                <TableHead>الأطراف</TableHead>
                 <TableHead>الهيئة القضائية</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead>الأتعاب</TableHead>
@@ -1741,13 +1742,51 @@ export function CasesSection() {
                   </TableCell>
                 </TableRow>
               ) : (
-                cases.map((caseItem) => (
+                cases.map((caseItem) => {
+                  // تنسيق أسماء الأطراف
+                  const getPartyNames = (role: 'plaintiff' | 'defendant') => {
+                    const partyList = role === 'plaintiff' ? caseItem.plaintiffs : caseItem.defendants;
+                    if (!partyList || partyList.length === 0) return null;
+                    
+                    return partyList.map(p => {
+                      if (p.clientName) {
+                        return p.clientDescription ? `${p.clientName} (${p.clientDescription})` : p.clientName;
+                      }
+                      const opponentName = [p.opponentFirstName, p.opponentLastName].filter(Boolean).join(' ');
+                      return opponentName || null;
+                    }).filter(Boolean).join('، ');
+                  };
+                  
+                  const plaintiffs = getPartyNames('plaintiff');
+                  const defendants = getPartyNames('defendant');
+                  
+                  return (
                   <TableRow key={caseItem.id}>
                     <TableCell className="font-medium">{caseItem.caseNumber || '-'}</TableCell>
                     <TableCell>
                       {CASE_TYPE_LABELS[caseItem.caseType] || CASE_TYPES.find(t => t.value === caseItem.caseType)?.label || caseItem.caseType || '-'}
                     </TableCell>
-                    <TableCell className="max-w-xs truncate">{caseItem.subject || '-'}</TableCell>
+                    <TableCell className="max-w-xs">
+                      <div className="flex flex-col gap-1">
+                        {plaintiffs && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] px-1">
+                              مدعي
+                            </Badge>
+                            <span className="truncate">{plaintiffs}</span>
+                          </div>
+                        )}
+                        {defendants && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px] px-1">
+                              مدعى عليه
+                            </Badge>
+                            <span className="truncate">{defendants}</span>
+                          </div>
+                        )}
+                        {!plaintiffs && !defendants && <span className="text-muted-foreground text-xs">-</span>}
+                      </div>
+                    </TableCell>
                     <TableCell>{caseItem.judicialBody || '-'}</TableCell>
                     <TableCell>
                       <Badge className={statusColors[caseItem.status]}>
@@ -1789,7 +1828,8 @@ export function CasesSection() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -1992,6 +2032,67 @@ export function CasesSection() {
                       <div>
                         <Label className="text-muted-foreground">تاريخ أول جلسة</Label>
                         <p className="font-medium">{formatDate(detailsCase?.firstSessionDate)}</p>
+                      </div>
+                    </div>
+                    
+                    <Separator />
+                    
+                    {/* أطراف القضية */}
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        أطراف القضية
+                      </h4>
+                      
+                      {/* المدعين */}
+                      <div className="mb-3">
+                        <Label className="text-muted-foreground text-xs mb-2 block">المدعين</Label>
+                        {detailsCase?.plaintiffs && detailsCase.plaintiffs.length > 0 ? (
+                          <div className="space-y-2">
+                            {detailsCase.plaintiffs.map((p, idx) => (
+                              <div key={idx} className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950/30 rounded border-r-4 border-green-500">
+                                <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                                  مدعي
+                                </Badge>
+                                <div className="flex-1">
+                                  <span className="font-medium">{p.clientName || 'غير محدد'}</span>
+                                  {p.clientDescription && (
+                                    <span className="text-muted-foreground text-sm mr-2">({p.clientDescription})</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-sm">لا يوجد مدعين مسجلين</p>
+                        )}
+                      </div>
+                      
+                      {/* المدعى عليهم */}
+                      <div>
+                        <Label className="text-muted-foreground text-xs mb-2 block">المدعى عليهم</Label>
+                        {detailsCase?.defendants && detailsCase.defendants.length > 0 ? (
+                          <div className="space-y-2">
+                            {detailsCase.defendants.map((p, idx) => {
+                              const name = p.clientName || [p.opponentFirstName, p.opponentLastName].filter(Boolean).join(' ') || 'غير محدد';
+                              return (
+                                <div key={idx} className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950/30 rounded border-r-4 border-red-500">
+                                  <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
+                                    مدعى عليه
+                                  </Badge>
+                                  <div className="flex-1">
+                                    <span className="font-medium">{name}</span>
+                                    {p.description && (
+                                      <span className="text-muted-foreground text-sm mr-2">({p.description})</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-sm">لا يوجد مدعى عليهم مسجلين</p>
+                        )}
                       </div>
                     </div>
                     

@@ -24,6 +24,14 @@ const STATUS_LABELS: Record<string, string> = {
 
 export async function GET(request: NextRequest) {
   try {
+    // التحقق من المصادقة
+    const cookieStore = await cookies();
+    const authenticated = cookieStore.get('authenticated');
+
+    if (authenticated?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const caseId = searchParams.get('id');
     const preview = searchParams.get('preview') === 'true';
