@@ -12,9 +12,18 @@ import {
   organizations, 
   activities 
 } from '@/db/schema';
+import { cookies } from 'next/headers';
 
 export async function POST() {
   try {
+    // التحقق من المصادقة
+    const cookieStore = await cookies();
+    const authenticated = cookieStore.get('authenticated');
+
+    if (authenticated?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     console.log('بدء حذف البيانات الاختبارية...');
 
     // حذف البيانات بالترتيب الصحيح (الجداول التابعة أولاً)
@@ -80,7 +89,7 @@ export async function POST() {
   } catch (error) {
     console.error('خطأ في حذف البيانات:', error);
     return NextResponse.json(
-      { success: false, error: 'حدث خطأ أثناء حذف البيانات' },
+      { success: false, error: 'حدث خطأ أثناء حذف البيانات', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
