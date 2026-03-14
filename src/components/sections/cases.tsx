@@ -2192,46 +2192,58 @@ export function CasesSection() {
 
       {/* Case Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FolderOpen className="h-5 w-5 text-primary" />
-              تفاصيل القضية - {detailsCase?.caseNumber || 'بدون رقم'}
-            </DialogTitle>
-            <DialogDescription>
-              {detailsCase?.subject || 'لا يوجد موضوع'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {detailsLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between mb-2">
-                <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
-                  <TabsTrigger value="info" className="gap-2">
-                    <Info className="h-4 w-4" />
-                    المعلومات الأساسية
-                  </TabsTrigger>
-                  <TabsTrigger value="parties" className="gap-2">
-                    <Users className="h-4 w-4" />
-                    الأطراف ({caseParties.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="sessions" className="gap-2">
-                    <CalendarDays className="h-4 w-4" />
-                    الجلسات ({sessions.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="files" className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    الملفات ({caseFiles.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="expenses" className="gap-2">
-                    <Receipt className="h-4 w-4" />
-                    المصاريف ({expenses.length})
-                  </TabsTrigger>
-                </TabsList>
+        <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden flex flex-col p-0">
+          {/* Professional Header with Key Info Cards */}
+          <div className="bg-gradient-to-l from-primary/10 via-primary/5 to-background p-4 md:p-6 border-b">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Scale className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-xl md:text-2xl font-bold">
+                      {detailsCase?.caseNumber || 'قضية بدون رقم'}
+                    </DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {detailsCase?.subject || 'لا يوجد موضوع'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Quick Actions */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDetailsOpen(false);
+                    setTimeout(() => openEditDialog(detailsCase!), 100);
+                  }}
+                  className="gap-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  <span className="hidden sm:inline">تعديل</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { resetSessionForm(); setSessionFormOpen(true); }}
+                  className="gap-2"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  <span className="hidden sm:inline">جلسة</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span className="hidden sm:inline">ملف</span>
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -2239,16 +2251,107 @@ export function CasesSection() {
                   className="gap-2"
                 >
                   <Printer className="h-4 w-4" />
-                  طباعة
+                  <span className="hidden sm:inline">طباعة</span>
                 </Button>
               </div>
+            </div>
+            
+            {/* Key Info Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <div className="bg-background/80 backdrop-blur rounded-xl p-3 border shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">نوع القضية</span>
+                </div>
+                <p className="font-semibold text-sm">{CASE_TYPE_LABELS[detailsCase?.caseType || ''] || '-'}</p>
+              </div>
+              <div className="bg-background/80 backdrop-blur rounded-xl p-3 border shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">الهيئة القضائية</span>
+                </div>
+                <p className="font-semibold text-sm truncate">{detailsCase?.judicialBody || '-'}</p>
+              </div>
+              <div className="bg-background/80 backdrop-blur rounded-xl p-3 border shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">الحالة</span>
+                </div>
+                <Badge className={`${statusColors[detailsCase?.status || 'active']} text-xs`}>
+                  {statusLabels[detailsCase?.status || 'active']}
+                </Badge>
+              </div>
+              <div className="bg-background/80 backdrop-blur rounded-xl p-3 border shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">تاريخ التسجيل</span>
+                </div>
+                <p className="font-semibold text-sm">{formatDate(detailsCase?.registrationDate)}</p>
+              </div>
+            </div>
+          </div>
+          
+          {detailsLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
+              {/* Horizontal Scrollable Tabs */}
+              <div className="border-b px-4 pt-2">
+                <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+                  <TabsTrigger 
+                    value="info" 
+                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
+                  >
+                    <Info className="h-4 w-4" />
+                    المعلومات
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="parties" 
+                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
+                  >
+                    <Users className="h-4 w-4" />
+                    الأطراف
+                    <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{caseParties.length}</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="sessions" 
+                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    الجلسات
+                    <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{sessions.length}</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="files" 
+                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
+                  >
+                    <FileText className="h-4 w-4" />
+                    الملفات
+                    <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{caseFiles.length}</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="expenses" 
+                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
+                  >
+                    <Receipt className="h-4 w-4" />
+                    المصاريف
+                    <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{expenses.length}</span>
+                  </TabsTrigger>
+                </div>
+              </div>
               
-              <div className="flex-1 overflow-y-auto mt-4">
+              <div className="flex-1 overflow-y-auto p-4">
                 {/* Basic Info Tab */}
-                <TabsContent value="info" className="m-0">
-                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                <TabsContent value="info" className="m-0 mt-0">
+                  <div className="space-y-6">
+                    {/* Section Header */}
                     <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold">معلومات القضية</h3>
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Info className="h-5 w-5 text-primary" />
+                        معلومات القضية
+                      </h3>
                       <Button
                         variant={editingBasicInfo ? "default" : "outline"}
                         size="sm"
@@ -2274,27 +2377,28 @@ export function CasesSection() {
                       </Button>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">رقم القضية</Label>
+                    {/* Info Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">رقم القضية</Label>
                         {editingBasicInfo ? (
                           <Input
                             value={basicInfoForm.caseNumber}
                             onChange={(e) => setBasicInfoForm({ ...basicInfoForm, caseNumber: e.target.value })}
-                            className="w-full mt-1"
+                            className="w-full"
                           />
                         ) : (
-                          <p className="font-medium mt-1">{detailsCase?.caseNumber || '-'}</p>
+                          <p className="font-semibold text-lg">{detailsCase?.caseNumber || '-'}</p>
                         )}
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">نوع القضية</Label>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">نوع القضية</Label>
                         {editingBasicInfo ? (
                           <Select
                             value={basicInfoForm.caseType}
                             onValueChange={(value) => setBasicInfoForm({ ...basicInfoForm, caseType: value })}
                           >
-                            <SelectTrigger className="w-full mt-1">
+                            <SelectTrigger className="w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2306,17 +2410,17 @@ export function CasesSection() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <p className="font-medium mt-1">{CASE_TYPE_LABELS[detailsCase?.caseType || ''] || '-'}</p>
+                          <p className="font-semibold text-lg">{CASE_TYPE_LABELS[detailsCase?.caseType || ''] || '-'}</p>
                         )}
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">الحالة</Label>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">الحالة</Label>
                         {editingBasicInfo ? (
                           <Select
                             value={basicInfoForm.status}
                             onValueChange={(value) => setBasicInfoForm({ ...basicInfoForm, status: value })}
                           >
-                            <SelectTrigger className="w-full mt-1">
+                            <SelectTrigger className="w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2327,211 +2431,192 @@ export function CasesSection() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Badge className={statusColors[detailsCase?.status || 'active']}>
+                          <Badge className={`${statusColors[detailsCase?.status || 'active']} text-base px-3 py-1`}>
                             {statusLabels[detailsCase?.status || 'active']}
                           </Badge>
                         )}
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">الأتعاب</Label>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">الأتعاب</Label>
                         {editingBasicInfo ? (
                           <Input
                             type="number"
                             value={basicInfoForm.fees}
                             onChange={(e) => setBasicInfoForm({ ...basicInfoForm, fees: e.target.value })}
                             placeholder="0"
-                            className="w-full mt-1"
+                            className="w-full"
                           />
                         ) : (
-                          <p className="font-medium mt-1">
+                          <p className="font-semibold text-lg text-green-600 dark:text-green-400">
                             {detailsCase?.fees ? `${detailsCase.fees.toLocaleString('ar-DZ')} د.ج` : '-'}
                           </p>
                         )}
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">الهيئة القضائية</Label>
-                        <p className="font-medium mt-1">{detailsCase?.judicialBody || '-'}</p>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">الهيئة القضائية</Label>
+                        <p className="font-semibold">{detailsCase?.judicialBody || '-'}</p>
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">الغرفة</Label>
-                        <p className="font-medium mt-1">{detailsCase?.chamber || '-'}</p>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">الغرفة</Label>
+                        <p className="font-semibold">{detailsCase?.chamber || '-'}</p>
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">الولاية</Label>
-                        <p className="font-medium mt-1">{detailsCase?.wilaya || '-'}</p>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">الولاية</Label>
+                        <p className="font-semibold">{detailsCase?.wilaya || '-'}</p>
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">تاريخ التسجيل</Label>
-                        <p className="font-medium mt-1">{formatDate(detailsCase?.registrationDate)}</p>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">تاريخ التسجيل</Label>
+                        <p className="font-semibold">{formatDate(detailsCase?.registrationDate)}</p>
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-muted-foreground">تاريخ أول جلسة</Label>
-                        <p className="font-medium mt-1">{formatDate(detailsCase?.firstSessionDate)}</p>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">تاريخ أول جلسة</Label>
+                        <p className="font-semibold">{formatDate(detailsCase?.firstSessionDate)}</p>
                       </div>
                     </div>
                     
-                    <Separator />
-                    
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">الموضوع</Label>
-                      {editingBasicInfo ? (
-                        <Textarea
-                          value={basicInfoForm.subject}
-                          onChange={(e) => setBasicInfoForm({ ...basicInfoForm, subject: e.target.value })}
-                          rows={3}
-                          className="w-full mt-1"
-                        />
-                      ) : (
-                        <p className="font-medium mt-1">{detailsCase?.subject || '-'}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">ملاحظات</Label>
-                      {editingBasicInfo ? (
-                        <Textarea
-                          value={basicInfoForm.notes}
-                          onChange={(e) => setBasicInfoForm({ ...basicInfoForm, notes: e.target.value })}
-                          rows={2}
-                          className="w-full mt-1"
-                        />
-                      ) : (
-                        <p className="font-medium mt-1">{detailsCase?.notes || '-'}</p>
-                      )}
+                    {/* Full Width Fields */}
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">الموضوع</Label>
+                        {editingBasicInfo ? (
+                          <Textarea
+                            value={basicInfoForm.subject}
+                            onChange={(e) => setBasicInfoForm({ ...basicInfoForm, subject: e.target.value })}
+                            rows={3}
+                            className="w-full"
+                          />
+                        ) : (
+                          <p className="font-medium">{detailsCase?.subject || '-'}</p>
+                        )}
+                      </div>
+                      <div className="bg-muted/30 rounded-xl p-4 border">
+                        <Label className="text-xs text-muted-foreground mb-1 block">ملاحظات</Label>
+                        {editingBasicInfo ? (
+                          <Textarea
+                            value={basicInfoForm.notes}
+                            onChange={(e) => setBasicInfoForm({ ...basicInfoForm, notes: e.target.value })}
+                            rows={2}
+                            className="w-full"
+                          />
+                        ) : (
+                          <p className="font-medium text-muted-foreground">{detailsCase?.notes || '-'}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
                 
-                {/* Parties Tab */}
-                <TabsContent value="parties" className="m-0">
-                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                    <h3 className="text-lg font-semibold mb-4">أطراف القضية</h3>
+                {/* Parties Tab - Professional Cards Layout */}
+                <TabsContent value="parties" className="m-0 mt-0">
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Users className="h-5 w-5 text-primary" />
+                        أطراف القضية
+                      </h3>
+                    </div>
                     
-                    {/* المدعين */}
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        المدعين / الموكلين ({caseParties.filter(p => p.role === 'plaintiff').length})
-                      </h4>
-                      {caseParties.filter(p => p.role === 'plaintiff').length === 0 ? (
-                        <p className="text-muted-foreground text-sm pr-6">لا يوجد مدعين مسجلين</p>
-                      ) : (
-                        <div className="space-y-2 pr-6">
-                          {caseParties.filter(p => p.role === 'plaintiff').map((party, index) => (
-                            <Card key={index} className="p-3">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="bg-green-50 text-green-700">
-                                    {index + 1}
+                    {caseParties.length === 0 ? (
+                      <div className="text-center py-12 bg-muted/30 rounded-xl border">
+                        <Users className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-muted-foreground">لا توجد أطراف مسجلة</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {caseParties.map((party, index) => {
+                          const isPlaintiff = party.role === 'plaintiff';
+                          const partyName = isPlaintiff 
+                            ? party.clientName || 'موكل غير محدد'
+                            : party.opponentFirstName && party.opponentLastName
+                              ? `${party.opponentFirstName} ${party.opponentLastName}`
+                              : party.description || 'خصم غير محدد';
+                          
+                          return (
+                            <Card key={index} className={`overflow-hidden ${isPlaintiff ? 'border-green-200 dark:border-green-800' : 'border-red-200 dark:border-red-800'}`}>
+                              <div className={`px-4 py-2 ${isPlaintiff ? 'bg-green-50 dark:bg-green-950/30' : 'bg-red-50 dark:bg-red-950/30'}`}>
+                                <div className="flex items-center justify-between">
+                                  <span className="font-semibold">{partyName}</span>
+                                  <Badge className={`${isPlaintiff ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'}`}>
+                                    {isPlaintiff ? 'مدعي' : 'مدعى عليه'}
                                   </Badge>
-                                  <span className="font-medium">{party.clientName || 'موكل غير محدد'}</span>
                                 </div>
-                                {party.clientDescription && (
-                                  <p className="text-sm text-muted-foreground pr-6">{party.clientDescription}</p>
+                              </div>
+                              <CardContent className="p-4 space-y-2">
+                                {isPlaintiff && party.clientDescription && (
+                                  <div className="flex items-start gap-2 text-sm">
+                                    <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                    <span>{party.clientDescription}</span>
+                                  </div>
+                                )}
+                                {!isPlaintiff && party.opponentPhone && (
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Phone className="h-4 w-4 text-muted-foreground" />
+                                    <span dir="ltr">{party.opponentPhone}</span>
+                                  </div>
+                                )}
+                                {!isPlaintiff && party.opponentAddress && (
+                                  <div className="flex items-start gap-2 text-sm">
+                                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                    <span>{party.opponentAddress}</span>
+                                  </div>
                                 )}
                                 {party.lawyerName && (
-                                  <div className="text-sm pr-6 flex items-center gap-2">
+                                  <div className="flex items-center gap-2 text-sm pt-2 border-t">
+                                    <User className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-muted-foreground">المحامي:</span>
-                                    <span>{party.lawyerName}</span>
+                                    <span className="font-medium">{party.lawyerName}</span>
                                   </div>
                                 )}
                                 {party.lawyerDescription && (
-                                  <p className="text-sm text-muted-foreground pr-6">{party.lawyerDescription}</p>
+                                  <p className="text-xs text-muted-foreground pr-6">{party.lawyerDescription}</p>
                                 )}
-                              </div>
+                              </CardContent>
                             </Card>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <Separator />
-                    
-                    {/* المدعى عليهم */}
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-red-700 dark:text-red-400 flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        المدعى عليهم / الخصوم ({caseParties.filter(p => p.role === 'defendant').length})
-                      </h4>
-                      {caseParties.filter(p => p.role === 'defendant').length === 0 ? (
-                        <p className="text-muted-foreground text-sm pr-6">لا يوجد مدعى عليهم مسجلين</p>
-                      ) : (
-                        <div className="space-y-2 pr-6">
-                          {caseParties.filter(p => p.role === 'defendant').map((party, index) => {
-                            const opponentName = party.opponentFirstName && party.opponentLastName
-                              ? `${party.opponentFirstName} ${party.opponentLastName}`
-                              : party.description || 'خصم غير محدد';
-                            
-                            return (
-                              <Card key={index} className="p-3">
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-red-50 text-red-700">
-                                      {index + 1}
-                                    </Badge>
-                                    <span className="font-medium">{opponentName}</span>
-                                  </div>
-                                  {party.opponentPhone && (
-                                    <div className="text-sm pr-6 flex items-center gap-2">
-                                      <Phone className="h-3 w-3 text-muted-foreground" />
-                                      <span>{party.opponentPhone}</span>
-                                    </div>
-                                  )}
-                                  {party.opponentAddress && (
-                                    <div className="text-sm pr-6 flex items-center gap-2">
-                                      <MapPin className="h-3 w-3 text-muted-foreground" />
-                                      <span>{party.opponentAddress}</span>
-                                    </div>
-                                  )}
-                                  {party.lawyerName && (
-                                    <div className="text-sm pr-6 flex items-center gap-2">
-                                      <span className="text-muted-foreground">المحامي:</span>
-                                      <span>{party.lawyerName}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
                 
                 {/* Sessions Tab */}
-                <TabsContent value="sessions" className="m-0">
+                <TabsContent value="sessions" className="m-0 mt-0">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold">الجلسات والتأجيلات</h3>
-                      <Button onClick={() => { resetSessionForm(); setSessionFormOpen(true); }} size="sm">
-                        <Plus className="h-4 w-4 ml-2" />
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <CalendarDays className="h-5 w-5 text-primary" />
+                        الجلسات والتأجيلات
+                      </h3>
+                      <Button onClick={() => { resetSessionForm(); setSessionFormOpen(true); }} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" />
                         إضافة جلسة
                       </Button>
                     </div>
                     
                     {sessions.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <CalendarDays className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>لا توجد جلسات مسجلة</p>
+                      <div className="text-center py-12 bg-muted/30 rounded-xl border">
+                        <CalendarDays className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-muted-foreground">لا توجد جلسات مسجلة</p>
                       </div>
                     ) : (
-                      <div className="border rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto rounded-xl border">
                         <Table>
                           <TableHeader>
-                            <TableRow>
-                              <TableHead>تاريخ الجلسة</TableHead>
-                              <TableHead>سبب التأجيل</TableHead>
-                              <TableHead>القرار</TableHead>
-                              <TableHead className="w-24">إجراءات</TableHead>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="font-semibold">تاريخ الجلسة</TableHead>
+                              <TableHead className="font-semibold">سبب التأجيل</TableHead>
+                              <TableHead className="font-semibold">القرار</TableHead>
+                              <TableHead className="font-semibold w-24">إجراءات</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {sessions.map((session) => (
-                              <TableRow key={session.id}>
-                                <TableCell>{formatDate(session.sessionDate)}</TableCell>
+                              <TableRow key={session.id} className="hover:bg-muted/30">
+                                <TableCell className="font-medium">{formatDate(session.sessionDate)}</TableCell>
                                 <TableCell>{session.adjournmentReason || '-'}</TableCell>
-                                <TableCell className="max-w-xs truncate">{session.decision || '-'}</TableCell>
+                                <TableCell className="max-w-xs">
+                                  <p className="truncate">{session.decision || '-'}</p>
+                                </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
                                     <Button
@@ -2562,15 +2647,18 @@ export function CasesSection() {
                 </TabsContent>
                 
                 {/* Files Tab */}
-                <TabsContent value="files" className="m-0">
+                <TabsContent value="files" className="m-0 mt-0">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold">الملفات</h3>
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-primary" />
+                        الملفات المرفقة
+                      </h3>
                     </div>
                     
                     {/* File Upload Area */}
                     <div
-                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                      className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
                         dragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
                       }`}
                       onDragEnter={handleDrag}
@@ -2578,11 +2666,11 @@ export function CasesSection() {
                       onDragOver={handleDrag}
                       onDrop={handleDrop}
                     >
-                      <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+                      <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
                       <p className="text-muted-foreground mb-4">اسحب الملفات هنا أو</p>
                       <div className="flex items-center justify-center gap-4 flex-wrap">
                         <Input
-                          placeholder="اسم الملف (اختياري - يُستخدم الاسم الأصلي إذا تُرك فارغاً)"
+                          placeholder="اسم الملف (اختياري)"
                           value={fileUploadForm.customName}
                           onChange={(e) => setFileUploadForm({ ...fileUploadForm, customName: e.target.value })}
                           className="w-64"
@@ -2608,88 +2696,91 @@ export function CasesSection() {
                     </div>
                     
                     {caseFiles.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>لا توجد ملفات مرفقة</p>
+                      <div className="text-center py-12 bg-muted/30 rounded-xl border">
+                        <FileText className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-muted-foreground">لا توجد ملفات مرفقة</p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {caseFiles.map((file) => {
-                          return (
-                            <div
-                              key={file.id}
-                              className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                            >
-                              <File className="h-8 w-8 text-muted-foreground flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{file.description || file.originalName}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatFileSize(file.fileSize)}
-                                </p>
-                              </div>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDownloadFile(file)}
-                                  title="تحميل"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteFile(file.id)}
-                                  title="حذف"
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
+                        {caseFiles.map((file) => (
+                          <div
+                            key={file.id}
+                            className="flex items-center gap-3 p-4 border rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              <File className="h-6 w-6 text-primary" />
                             </div>
-                          );
-                        })}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{file.description || file.originalName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.fileSize)}
+                              </p>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDownloadFile(file)}
+                                title="تحميل"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteFile(file.id)}
+                                title="حذف"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
                 </TabsContent>
                 
                 {/* Expenses Tab */}
-                <TabsContent value="expenses" className="m-0">
+                <TabsContent value="expenses" className="m-0 mt-0">
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="flex items-center gap-4">
-                        <h3 className="text-lg font-semibold">المصاريف</h3>
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                          <Receipt className="h-5 w-5 text-primary" />
+                          المصاريف
+                        </h3>
                         {totalExpenses > 0 && (
-                          <Badge variant="secondary" className="text-base">
+                          <Badge variant="secondary" className="text-base px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
                             المجموع: {totalExpenses.toLocaleString('ar-DZ')} د.ج
                           </Badge>
                         )}
                       </div>
-                      <Button onClick={() => { resetExpenseForm(); setExpenseFormOpen(true); }} size="sm">
-                        <Plus className="h-4 w-4 ml-2" />
+                      <Button onClick={() => { resetExpenseForm(); setExpenseFormOpen(true); }} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" />
                         إضافة مصروف
                       </Button>
                     </div>
                     
                     {expenses.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <DollarSign className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                        <p>لا توجد مصاريف مسجلة</p>
+                      <div className="text-center py-12 bg-muted/30 rounded-xl border">
+                        <Receipt className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                        <p className="text-muted-foreground">لا توجد مصاريف مسجلة</p>
                       </div>
                     ) : (
-                      <div className="border rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto rounded-xl border">
                         <Table>
                           <TableHeader>
-                            <TableRow>
-                              <TableHead>الوصف</TableHead>
-                              <TableHead>المبلغ</TableHead>
-                              <TableHead>التاريخ</TableHead>
-                              <TableHead className="w-24">إجراءات</TableHead>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="font-semibold">الوصف</TableHead>
+                              <TableHead className="font-semibold">المبلغ</TableHead>
+                              <TableHead className="font-semibold">التاريخ</TableHead>
+                              <TableHead className="font-semibold w-24">إجراءات</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {expenses.map((expense) => (
-                              <TableRow key={expense.id}>
+                              <TableRow key={expense.id} className="hover:bg-muted/30">
                                 <TableCell>
                                   <div>
                                     <p className="font-medium">{expense.description}</p>
@@ -2698,7 +2789,7 @@ export function CasesSection() {
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell className="font-medium">
+                                <TableCell className="font-semibold text-green-600 dark:text-green-400">
                                   {expense.amount.toLocaleString('ar-DZ')} د.ج
                                 </TableCell>
                                 <TableCell>{formatDate(expense.expenseDate)}</TableCell>
