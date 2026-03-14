@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/auth/login-form';
 import { Sidebar } from '@/components/layout/sidebar';
 import { MobileNav } from '@/components/layout/mobile-nav';
-import { GlobalSearch } from '@/components/layout/global-search';
+import { SmartSearch } from '@/components/layout/smart-search';
 import { Dashboard } from '@/components/dashboard';
 import { JudicialBodiesSection } from '@/components/sections/judicial-bodies-new';
 import { ClientsSection } from '@/components/sections/clients';
@@ -62,7 +62,7 @@ function MainContent() {
         
         {/* Search bar - مخفي على الهاتف */}
         <div className="mb-4 md:mb-6 hidden md:block">
-          <GlobalSearch />
+          <SmartSearch />
         </div>
         
         {/* Content */}
