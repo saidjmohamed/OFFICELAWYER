@@ -603,34 +603,42 @@ export function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-2">
                 <a 
                   href="/?section=cases" 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
-                  <Briefcase className="h-4 w-4 text-blue-500" />
-                  <span>القضايا</span>
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Briefcase className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <span className="font-medium">القضايا</span>
                 </a>
                 <a 
                   href="/?section=calendar" 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
-                  <CalendarDays className="h-4 w-4 text-emerald-500" />
-                  <span>الرزمانة</span>
+                  <div className="p-2 bg-emerald-500/20 rounded-lg">
+                    <CalendarDays className="h-5 w-5 text-emerald-500" />
+                  </div>
+                  <span className="font-medium">الرزمانة</span>
                 </a>
                 <a 
                   href="/?section=clients" 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
-                  <Users className="h-4 w-4 text-amber-500" />
-                  <span>الموكلين</span>
+                  <div className="p-2 bg-amber-500/20 rounded-lg">
+                    <Users className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <span className="font-medium">الموكلين</span>
                 </a>
                 <a 
                   href="/?section=sessions" 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
-                  <FileText className="h-4 w-4 text-purple-500" />
-                  <span>الجلسات</span>
+                  <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <FileText className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <span className="font-medium">الجلسات</span>
                 </a>
               </div>
             </CardContent>

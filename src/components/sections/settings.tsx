@@ -912,6 +912,78 @@ export function SettingsSection() {
               <BackupSection />
             </CardContent>
           </Card>
+
+          {/* قسم حذف البيانات الاختبارية */}
+          <Card className="border-2 border-destructive/50">
+            <CardHeader>
+              <div className="flex items-center gap-2 text-destructive">
+                <Trash2 className="h-5 w-5" />
+                <CardTitle>حذف البيانات الاختبارية</CardTitle>
+              </div>
+              <CardDescription>حذف جميع البيانات الاختبارية والبدء من جديد</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+                <p className="text-sm text-destructive font-medium mb-2">⚠️ تحذير!</p>
+                <p className="text-sm text-muted-foreground">
+                  سيتم حذف جميع البيانات التالية نهائياً ولا يمكن استرجاعها:
+                </p>
+                <ul className="text-sm text-muted-foreground mt-2 space-y-1 mr-4 list-disc">
+                  <li>جميع القضايا والجلسات</li>
+                  <li>جميع الموكلين والأطراف</li>
+                  <li>جميع المحامين والمنظمات</li>
+                  <li>جميع ملفات ومصاريف القضايا</li>
+                  <li>جميع أحداث التقويم</li>
+                  <li>سجل النشاطات</li>
+                </ul>
+                <p className="text-sm text-muted-foreground mt-2">
+                  سيتم الإبقاء على: الولايات، الهيئات القضائية، الغرف والأقسام، الإعدادات.
+                </p>
+              </div>
+              
+              <Button 
+                onClick={async () => {
+                  if (confirm('هل أنت متأكد من حذف جميع البيانات الاختبارية؟ هذا الإجراء لا يمكن التراجع عنه!')) {
+                    try {
+                      const response = await fetch('/api/clear-test-data', { method: 'POST' });
+                      const data = await response.json();
+                      
+                      if (response.ok) {
+                        toast({ 
+                          title: 'تم الحذف', 
+                          description: 'تم حذف جميع البيانات الاختبارية بنجاح',
+                          variant: 'default'
+                        });
+                        // إعادة تحميل الإحصائيات
+                        const settingsRes = await fetch('/api/settings');
+                        if (settingsRes.ok) {
+                          const newData = await settingsRes.json();
+                          setRecordCounts(newData.recordCounts);
+                        }
+                      } else {
+                        toast({ 
+                          title: 'خطأ', 
+                          description: data.error || 'فشل في حذف البيانات', 
+                          variant: 'destructive' 
+                        });
+                      }
+                    } catch {
+                      toast({ 
+                        title: 'خطأ', 
+                        description: 'حدث خطأ في الاتصال', 
+                        variant: 'destructive' 
+                      });
+                    }
+                  }
+                }}
+                variant="destructive"
+                className="w-full"
+              >
+                <Trash2 className="ml-2 h-4 w-4" />
+                حذف جميع البيانات الاختبارية
+              </Button>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
