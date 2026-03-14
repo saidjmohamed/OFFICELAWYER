@@ -144,21 +144,25 @@ html {
 /* SCROLLING FIX         */
 /* ===================== */
 
-/* Allow normal scrolling - Mobile First */
+/* Allow normal scrolling on ALL devices */
 html {
-  height: 100%;
+  width: 100%;
+  min-height: 100vh;
   scroll-behavior: smooth;
   overflow-x: hidden;
   overflow-y: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 body {
-  min-height: 100%;
-  height: auto;
+  width: 100%;
+  min-height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  position: relative;
+  overscroll-behavior: contain;
 }
 
 /* Standalone PWA mode adjustments */
@@ -189,8 +193,8 @@ body {
     transition-duration: 50ms !important;
   }
   
-  /* Touch optimization */
-  button, a, [role="button"], input, select, textarea {
+  /* Touch optimization for interactive elements ONLY */
+  button, a, [role="button"] {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
@@ -201,20 +205,17 @@ body {
     -webkit-user-select: none;
   }
   
-  /* Smooth scrolling */
+  /* Smooth scrolling for scrollable containers */
   .overflow-auto, .overflow-y-auto, .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    touch-action: pan-y;
   }
   
   /* Fix iOS input zoom */
   input, select, textarea {
     font-size: 16px !important;
-  }
-  
-  /* Prevent double-tap zoom */
-  html {
-    touch-action: manipulation;
+    touch-action: auto;
   }
   
   /* Faster animations */
