@@ -4,53 +4,49 @@ import { cases, sessions, clients, judicialBodies, activities, caseClients, cale
 import { eq, sql, desc, gte } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
-// POST method لحذف البيانات الاختبارية
-export async function POST(request: Request) {
+// GET method can also clear data with special parameters
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     
+    // حذف البيانات الاختبارية
     if (action === 'clear-all-data') {
       const confirm = searchParams.get('confirm');
       if (confirm !== 'yes-delete-all') {
         return NextResponse.json({ 
           error: 'يتطلب تأكيد',
-          message: 'أضف ?confirm=yes-delete-all للتأكيد'
+          message: 'أضف &confirm=yes-delete-all للتأكيد',
+          warning: 'هذا سيحذف جميع البيانات!'
         }, { status: 400 });
       }
 
       console.log('🗑️ بدء حذف البيانات الاختبارية...');
 
       // حذف البيانات بالترتيب الصحيح
-      try { await db.delete(calendarEvents); console.log('✓ أحداث التقويم'); } catch (e) {}
-      try { await db.delete(caseExpenses); console.log('✓ مصاريف القضايا'); } catch (e) {}
-      try { await db.delete(caseFiles); console.log('✓ ملفات القضايا'); } catch (e) {}
-      try { await db.delete(sessions); console.log('✓ الجلسات'); } catch (e) {}
-      try { await db.delete(caseClients); console.log('✓ أطراف القضايا'); } catch (e) {}
-      try { await db.delete(cases); console.log('✓ القضايا'); } catch (e) {}
-      try { await db.delete(clients); console.log('✓ الموكلين'); } catch (e) {}
-      try { await db.delete(lawyers); console.log('✓ المحامين'); } catch (e) {}
-      try { await db.delete(organizations); console.log('✓ المنظمات'); } catch (e) {}
-      try { await db.delete(activities); console.log('✓ سجل النشاطات'); } catch (e) {}
+      const results: string[] = [];
+      try { await db.delete(calendarEvents); results.push('✓ أحداث التقويم'); } catch (e) { results.push('✗ أحداث التقويم'); }
+      try { await db.delete(caseExpenses); results.push('✓ مصاريف القضايا'); } catch (e) { results.push('✗ مصاريف القضايا'); }
+      try { await db.delete(caseFiles); results.push('✓ ملفات القضايا'); } catch (e) { results.push('✗ ملفات القضايا'); }
+      try { await db.delete(sessions); results.push('✓ الجلسات'); } catch (e) { results.push('✗ الجلسات'); }
+      try { await db.delete(caseClients); results.push('✓ أطراف القضايا'); } catch (e) { results.push('✗ أطراف القضايا'); }
+      try { await db.delete(cases); results.push('✓ القضايا'); } catch (e) { results.push('✗ القضايا'); }
+      try { await db.delete(clients); results.push('✓ الموكلين'); } catch (e) { results.push('✗ الموكلين'); }
+      try { await db.delete(lawyers); results.push('✓ المحامين'); } catch (e) { results.push('✗ المحامين'); }
+      try { await db.delete(organizations); results.push('✓ المنظمات'); } catch (e) { results.push('✗ المنظمات'); }
+      try { await db.delete(activities); results.push('✓ سجل النشاطات'); } catch (e) { results.push('✗ سجل النشاطات'); }
 
       console.log('✅ تم حذف جميع البيانات بنجاح');
       
       return NextResponse.json({ 
         success: true, 
         message: 'تم حذف جميع البيانات الاختبارية بنجاح',
+        results,
         timestamp: new Date().toISOString()
       });
     }
     
-    return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
-  } catch (error) {
-    console.error('خطأ:', error);
-    return NextResponse.json({ error: 'حدث خطأ' }, { status: 500 });
-  }
-}
-
-export async function GET() {
-  try {
+    // المتابعة مع GET العادي للإحصائيات
     const cookieStore = await cookies();
     const authenticated = cookieStore.get('authenticated');
 
