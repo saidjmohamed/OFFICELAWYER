@@ -27,6 +27,7 @@ export function DemoBanner() {
     <div 
       className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
       onClick={handleDismiss}
+      style={{ touchAction: 'auto' }}
     >
       <div 
         className="bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl shadow-2xl max-w-md w-full p-6 mx-4"

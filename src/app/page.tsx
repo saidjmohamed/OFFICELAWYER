@@ -53,7 +53,7 @@ function MainContent() {
   };
 
   return (
-    <main className="flex-1 w-full bg-muted/30 overflow-y-auto overflow-x-hidden">
+    <main className="flex-1 w-full bg-muted/30">
       <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 pt-20 md:pt-6 pb-28 md:pb-6">
         {/* إشعار التحديث */}
         <div className="mb-3 md:mb-4">
@@ -125,12 +125,12 @@ export default function Home() {
 
   return (
     <ThemeProvider>
-      <div className="min-h-screen w-full flex flex-col overflow-x-hidden">
+      <div className="min-h-screen w-full flex">
         {/* Sidebar للكمبيوتر */}
         <Sidebar />
         
         {/* المحتوى الرئيسي */}
-        <div className="flex-1 w-full md:mr-64 flex flex-col overflow-y-auto">
+        <div className="flex-1 w-full md:mr-64 flex flex-col min-h-screen">
           <Suspense fallback={
             <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

@@ -151,36 +151,24 @@ html {
 
 html {
   width: 100%;
-  height: auto;
+  min-height: 100vh;
   scroll-behavior: smooth;
   overflow-x: hidden;
   overflow-y: auto;
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
   -webkit-text-size-adjust: 100%;
 }
 
 body {
   width: 100%;
   min-height: 100vh;
-  height: auto;
   overflow-x: hidden;
   overflow-y: auto;
-  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 
 /* Global touch optimization - buttons only, NOT the page! */
 button, a, [role="button"] {
   touch-action: manipulation;
-}
-
-/* Ensure all containers are scrollable on mobile */
-#__next, .app-container, main, [role="main"] {
-  min-height: 100vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 /* Standalone PWA mode adjustments */
