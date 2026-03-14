@@ -274,18 +274,18 @@ export function SettingsSection() {
       </div>
 
       <Tabs defaultValue="office" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="office" className="flex items-center gap-2">
+        <TabsList className="flex w-full overflow-x-auto flex-nowrap gap-2 whitespace-nowrap justify-start rounded-lg bg-muted p-1">
+          <TabsTrigger value="office" className="flex items-center gap-2 px-4 py-2 whitespace-nowrap shrink-0">
             <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">معلومات المكتب</span>
+            <span>معلومات المكتب</span>
           </TabsTrigger>
-          <TabsTrigger value="customize" className="flex items-center gap-2">
+          <TabsTrigger value="customize" className="flex items-center gap-2 px-4 py-2 whitespace-nowrap shrink-0">
             <Palette className="h-4 w-4" />
-            <span className="hidden sm:inline">التخصيص</span>
+            <span>التخصيص</span>
           </TabsTrigger>
-          <TabsTrigger value="data" className="flex items-center gap-2">
+          <TabsTrigger value="data" className="flex items-center gap-2 px-4 py-2 whitespace-nowrap shrink-0">
             <Database className="h-4 w-4" />
-            <span className="hidden sm:inline">البيانات</span>
+            <span>البيانات</span>
           </TabsTrigger>
         </TabsList>
 
