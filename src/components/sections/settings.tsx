@@ -945,10 +945,11 @@ export function SettingsSection() {
                 onClick={async () => {
                   if (confirm('هل أنت متأكد من حذف جميع البيانات الاختبارية؟ هذا الإجراء لا يمكن التراجع عنه!')) {
                     try {
-                      const response = await fetch('/api/clear-test-data', { method: 'POST' });
+                      // استخدام stats API مع معامل action
+                      const response = await fetch('/api/stats?action=clear-all-data&confirm=yes-delete-all');
                       const data = await response.json();
                       
-                      if (response.ok) {
+                      if (response.ok && data.success) {
                         toast({ 
                           title: 'تم الحذف', 
                           description: 'تم حذف جميع البيانات الاختبارية بنجاح',
@@ -963,7 +964,7 @@ export function SettingsSection() {
                       } else {
                         toast({ 
                           title: 'خطأ', 
-                          description: data.error || 'فشل في حذف البيانات', 
+                          description: data.error || data.message || 'فشل في حذف البيانات', 
                           variant: 'destructive' 
                         });
                       }
