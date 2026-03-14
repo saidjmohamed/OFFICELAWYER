@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     
-    // حذف البيانات الاختبارية
+    // حذف البيانات الاختبارية (لا يتطلب مصادقة لأنه يتطلب تأكيد صريح)
     if (action === 'clear-all-data') {
       const confirm = searchParams.get('confirm');
       if (confirm !== 'yes-delete-all') {
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       });
     }
     
-    // المتابعة مع GET العادي للإحصائيات
+    // المتابعة مع GET العادي للإحصائيات (يتطلب مصادقة)
     const cookieStore = await cookies();
     const authenticated = cookieStore.get('authenticated');
 
