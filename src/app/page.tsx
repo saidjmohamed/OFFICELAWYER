@@ -53,10 +53,10 @@ function MainContent() {
   };
 
   return (
-    <main className="flex-1 bg-muted/30 overflow-y-auto">
-      <div className="container mx-auto p-4 md:p-6 max-w-7xl pt-20 md:pt-6 pb-24 md:pb-6 min-h-screen">
+    <main className="flex-1 w-full bg-muted/30 overflow-y-auto overflow-x-hidden">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 pt-20 md:pt-6 pb-28 md:pb-6">
         {/* إشعار التحديث */}
-        <div className="mb-4">
+        <div className="mb-3 md:mb-4">
           <UpdateNotification />
         </div>
         
@@ -106,8 +106,8 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
-        <div className="flex flex-col items-center gap-4">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-background to-muted">
+        <div className="flex flex-col items-center gap-4 p-4">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p className="text-muted-foreground">جاري التحميل...</p>
         </div>
@@ -117,7 +117,7 @@ export default function Home() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
+      <div className="min-h-screen w-full flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
         <LoginForm onLoginSuccess={handleLoginSuccess} />
       </div>
     );
@@ -125,12 +125,12 @@ export default function Home() {
 
   return (
     <ThemeProvider>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen w-full flex flex-col overflow-x-hidden">
         {/* Sidebar للكمبيوتر */}
         <Sidebar />
         
         {/* المحتوى الرئيسي */}
-        <div className="flex-1 md:mr-64 flex flex-col">
+        <div className="flex-1 w-full md:mr-64 flex flex-col overflow-y-auto">
           <Suspense fallback={
             <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
