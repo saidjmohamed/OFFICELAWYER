@@ -2298,49 +2298,47 @@ export function CasesSection() {
           ) : (
             <Tabs defaultValue="info" className="flex-1 flex flex-col overflow-hidden">
               {/* Horizontal Scrollable Tabs */}
-              <div className="border-b px-4 pt-2">
-                <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
-                  <TabsTrigger 
-                    value="info" 
-                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
-                  >
-                    <Info className="h-4 w-4" />
-                    المعلومات
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="parties" 
-                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
-                  >
-                    <Users className="h-4 w-4" />
-                    الأطراف
-                    <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{caseParties.length}</span>
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="sessions" 
-                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
-                  >
-                    <CalendarDays className="h-4 w-4" />
-                    الجلسات
-                    <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{sessions.length}</span>
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="files" 
-                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
-                  >
-                    <FileText className="h-4 w-4" />
-                    الملفات
-                    <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{caseFiles.length}</span>
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="expenses" 
-                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shrink-0"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    المصاريف
-                    <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{expenses.length}</span>
-                  </TabsTrigger>
-                </div>
-              </div>
+              <TabsList className="flex w-full overflow-x-auto flex-nowrap gap-2 whitespace-nowrap justify-start rounded-none border-b bg-transparent p-0 h-auto">
+                <TabsTrigger 
+                  value="info" 
+                  className="flex items-center gap-2 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm whitespace-nowrap shrink-0"
+                >
+                  <Info className="h-4 w-4" />
+                  المعلومات
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="parties" 
+                  className="flex items-center gap-2 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm whitespace-nowrap shrink-0"
+                >
+                  <Users className="h-4 w-4" />
+                  الأطراف
+                  <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{caseParties.length}</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="sessions" 
+                  className="flex items-center gap-2 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm whitespace-nowrap shrink-0"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  الجلسات
+                  <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{sessions.length}</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="files" 
+                  className="flex items-center gap-2 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm whitespace-nowrap shrink-0"
+                >
+                  <FileText className="h-4 w-4" />
+                  الملفات
+                  <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{caseFiles.length}</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="expenses" 
+                  className="flex items-center gap-2 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none text-sm whitespace-nowrap shrink-0"
+                >
+                  <Receipt className="h-4 w-4" />
+                  المصاريف
+                  <span className="bg-muted-foreground/20 px-1.5 py-0.5 rounded text-xs">{expenses.length}</span>
+                </TabsTrigger>
+              </TabsList>
               
               <div className="flex-1 overflow-y-auto p-4">
                 {/* Basic Info Tab */}
