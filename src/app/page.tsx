@@ -60,8 +60,8 @@ function MainContent() {
           <UpdateNotification />
         </div>
         
-        {/* Search bar - مخفي على الهاتف */}
-        <div className="mb-4 md:mb-6 hidden md:block">
+        {/* Search bar - يظهر على جميع الأجهزة */}
+        <div className="mb-4 md:mb-6">
           <SmartSearch />
         </div>
         
