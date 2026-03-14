@@ -2192,7 +2192,7 @@ export function CasesSection() {
 
       {/* Case Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden flex flex-col p-0">
+        <DialogContent className="max-w-6xl max-h-[95vh] flex flex-col p-0 overflow-visible">
           {/* Professional Header with Key Info Cards */}
           <div className="bg-gradient-to-l from-primary/10 via-primary/5 to-background p-4 md:p-6 border-b">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -2296,11 +2296,19 @@ export function CasesSection() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0">
               {/* Sticky Tabs Bar - Modern Scrollable Design */}
-              <div className="sticky top-0 z-10 bg-background border-b">
-                <div className="w-full overflow-x-auto scrollbar-hide touch-pan-x">
-                  <div className="flex min-w-max gap-1 px-2 py-2">
+              <div className="sticky top-0 z-10 bg-background border-b shrink-0">
+                <div 
+                  className="w-full overflow-x-auto scrollbar-hide"
+                  style={{ 
+                    WebkitOverflowScrolling: 'touch',
+                    touchAction: 'pan-x',
+                    overflowY: 'hidden',
+                    overflowX: 'auto'
+                  }}
+                >
+                  <div className="flex gap-1 px-2 py-2" style={{ minWidth: 'max-content' }}>
                     {/* المعلومات */}
                     <button
                       onClick={() => setActiveTab('info')}
