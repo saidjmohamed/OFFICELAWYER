@@ -1,8 +1,53 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { cases, sessions, clients, judicialBodies, activities } from '@/db/schema';
+import { cases, sessions, clients, judicialBodies, activities, caseClients, calendarEvents, caseFiles, caseExpenses, lawyers, organizations } from '@/db/schema';
 import { eq, sql, desc, gte } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+
+// POST method لحذف البيانات الاختبارية
+export async function POST(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const action = searchParams.get('action');
+    
+    if (action === 'clear-all-data') {
+      const confirm = searchParams.get('confirm');
+      if (confirm !== 'yes-delete-all') {
+        return NextResponse.json({ 
+          error: 'يتطلب تأكيد',
+          message: 'أضف ?confirm=yes-delete-all للتأكيد'
+        }, { status: 400 });
+      }
+
+      console.log('🗑️ بدء حذف البيانات الاختبارية...');
+
+      // حذف البيانات بالترتيب الصحيح
+      try { await db.delete(calendarEvents); console.log('✓ أحداث التقويم'); } catch (e) {}
+      try { await db.delete(caseExpenses); console.log('✓ مصاريف القضايا'); } catch (e) {}
+      try { await db.delete(caseFiles); console.log('✓ ملفات القضايا'); } catch (e) {}
+      try { await db.delete(sessions); console.log('✓ الجلسات'); } catch (e) {}
+      try { await db.delete(caseClients); console.log('✓ أطراف القضايا'); } catch (e) {}
+      try { await db.delete(cases); console.log('✓ القضايا'); } catch (e) {}
+      try { await db.delete(clients); console.log('✓ الموكلين'); } catch (e) {}
+      try { await db.delete(lawyers); console.log('✓ المحامين'); } catch (e) {}
+      try { await db.delete(organizations); console.log('✓ المنظمات'); } catch (e) {}
+      try { await db.delete(activities); console.log('✓ سجل النشاطات'); } catch (e) {}
+
+      console.log('✅ تم حذف جميع البيانات بنجاح');
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: 'تم حذف جميع البيانات الاختبارية بنجاح',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    return NextResponse.json({ error: 'إجراء غير معروف' }, { status: 400 });
+  } catch (error) {
+    console.error('خطأ:', error);
+    return NextResponse.json({ error: 'حدث خطأ' }, { status: 500 });
+  }
+}
 
 export async function GET() {
   try {
