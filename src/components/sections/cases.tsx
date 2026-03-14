@@ -1303,23 +1303,24 @@ export function CasesSection() {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-primary">معلومات تسجيل القضية</h3>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>رقم القضية</Label>
+                    <Label className="text-sm font-medium">رقم القضية</Label>
                     <Input
                       value={formData.caseNumber}
                       onChange={(e) => setFormData({ ...formData, caseNumber: e.target.value })}
                       placeholder="أدخل رقم القضية"
+                      className="w-full mt-1"
                     />
                   </div>
 
                   <div>
-                    <Label>نوع القضية</Label>
+                    <Label className="text-sm font-medium">نوع القضية</Label>
                     <Select
                       value={formData.caseType}
                       onValueChange={(value) => setFormData({ ...formData, caseType: value })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full mt-1">
                         <SelectValue placeholder="اختر نوع القضية" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1333,14 +1334,14 @@ export function CasesSection() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>الولاية</Label>
+                    <Label className="text-sm font-medium">الولاية</Label>
                     <Select
                       value={formData.wilayaId}
                       onValueChange={(value) => setFormData({ ...formData, wilayaId: value, judicialBodyId: '', chamberId: '' })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full mt-1">
                         <SelectValue placeholder="اختر الولاية" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1354,12 +1355,12 @@ export function CasesSection() {
                   </div>
 
                   <div>
-                    <Label>المسجلة في (مجلس / محكمة)</Label>
+                    <Label className="text-sm font-medium">المسجلة في (مجلس / محكمة)</Label>
                     <Select
                       value={formData.judicialBodyId}
                       onValueChange={(value) => setFormData({ ...formData, judicialBodyId: value, chamberId: '' })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full mt-1">
                         <SelectValue placeholder="اختر الهيئة القضائية" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1373,15 +1374,15 @@ export function CasesSection() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label>الغرفة أو القسم</Label>
+                    <Label className="text-sm font-medium">الغرفة أو القسم</Label>
                     <Select
                       value={formData.chamberId}
                       onValueChange={(value) => setFormData({ ...formData, chamberId: value })}
                       disabled={!formData.judicialBodyId}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full mt-1">
                         <SelectValue placeholder="اختر الغرفة" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1401,13 +1402,13 @@ export function CasesSection() {
                   </div>
 
                   <div>
-                    <Label>رقم الغرفة</Label>
+                    <Label className="text-sm font-medium">رقم الغرفة</Label>
                     <Select
                       value={formData.roomNumber}
                       onValueChange={(value) => setFormData({ ...formData, roomNumber: value })}
                       disabled={!formData.judicialBodyId}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full mt-1">
                         <SelectValue placeholder="اختر الرقم" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1421,12 +1422,12 @@ export function CasesSection() {
                   </div>
 
                   <div>
-                    <Label>الحالة</Label>
+                    <Label className="text-sm font-medium">الحالة</Label>
                     <Select
                       value={formData.status}
                       onValueChange={(value) => setFormData({ ...formData, status: value })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full mt-1">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1439,22 +1440,24 @@ export function CasesSection() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>تاريخ التسجيل</Label>
+                    <Label className="text-sm font-medium">تاريخ التسجيل</Label>
                     <Input
                       type="date"
                       value={formData.registrationDate}
                       onChange={(e) => setFormData({ ...formData, registrationDate: e.target.value })}
+                      className="w-full mt-1"
                     />
                   </div>
                   
                   <div>
-                    <Label>تاريخ أول جلسة</Label>
+                    <Label className="text-sm font-medium">تاريخ أول جلسة</Label>
                     <Input
                       type="date"
                       value={formData.firstSessionDate}
                       onChange={(e) => setFormData({ ...formData, firstSessionDate: e.target.value })}
+                      className="w-full mt-1"
                     />
                   </div>
                 </div>
@@ -1467,29 +1470,32 @@ export function CasesSection() {
                 <>
                   <div className="space-y-4 bg-orange-50 dark:bg-orange-950/20 p-4 rounded-lg border border-orange-200">
                     <h3 className="text-lg font-semibold text-orange-700 dark:text-orange-400">بيانات المعارضة</h3>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <Label>رقم الحكم أو القرار الغيابي</Label>
+                        <Label className="text-sm font-medium">رقم الحكم أو القرار الغيابي</Label>
                         <Input
                           value={formData.judgmentNumber}
                           onChange={(e) => setFormData({ ...formData, judgmentNumber: e.target.value })}
                           placeholder="رقم الحكم"
+                          className="w-full mt-1"
                         />
                       </div>
                       <div>
-                        <Label>تاريخ صدور الحكم</Label>
+                        <Label className="text-sm font-medium">تاريخ صدور الحكم</Label>
                         <Input
                           type="date"
                           value={formData.judgmentDate}
                           onChange={(e) => setFormData({ ...formData, judgmentDate: e.target.value })}
+                          className="w-full mt-1"
                         />
                       </div>
                       <div>
-                        <Label>المحكمة أو المجلس الصادر منه</Label>
+                        <Label className="text-sm font-medium">المحكمة أو المجلس الصادر منه</Label>
                         <Input
                           value={formData.issuingCourt}
                           onChange={(e) => setFormData({ ...formData, issuingCourt: e.target.value })}
                           placeholder="اسم الجهة"
+                          className="w-full mt-1"
                         />
                       </div>
                     </div>
@@ -1503,29 +1509,32 @@ export function CasesSection() {
                 <>
                   <div className="space-y-4 bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200">
                     <h3 className="text-lg font-semibold text-blue-700 dark:text-blue-400">بيانات الاستئناف</h3>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <Label>رقم الحكم الابتدائي</Label>
+                        <Label className="text-sm font-medium">رقم الحكم الابتدائي</Label>
                         <Input
                           value={formData.originalCaseNumber}
                           onChange={(e) => setFormData({ ...formData, originalCaseNumber: e.target.value })}
                           placeholder="رقم الحكم"
+                          className="w-full mt-1"
                         />
                       </div>
                       <div>
-                        <Label>تاريخ صدور الحكم الابتدائي</Label>
+                        <Label className="text-sm font-medium">تاريخ صدور الحكم الابتدائي</Label>
                         <Input
                           type="date"
                           value={formData.originalJudgmentDate}
                           onChange={(e) => setFormData({ ...formData, originalJudgmentDate: e.target.value })}
+                          className="w-full mt-1"
                         />
                       </div>
                       <div>
-                        <Label>المحكمة أو المجلس الصادر منه</Label>
+                        <Label className="text-sm font-medium">المحكمة أو المجلس الصادر منه</Label>
                         <Input
                           value={formData.originalCourt}
                           onChange={(e) => setFormData({ ...formData, originalCourt: e.target.value })}
                           placeholder="اسم الجهة"
+                          className="w-full mt-1"
                         />
                       </div>
                     </div>
@@ -1539,22 +1548,23 @@ export function CasesSection() {
                 <>
                   <div className="space-y-4 bg-purple-50 dark:bg-purple-950/20 p-4 rounded-lg border border-purple-200">
                     <h3 className="text-lg font-semibold text-purple-700 dark:text-purple-400">بيانات الطعن بالنقض</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label>تاريخ آخر قرار من المجلس</Label>
+                        <Label className="text-sm font-medium">تاريخ آخر قرار من المجلس</Label>
                         <Input
                           type="date"
                           value={formData.councilDecisionDate}
                           onChange={(e) => setFormData({ ...formData, councilDecisionDate: e.target.value })}
+                          className="w-full mt-1"
                         />
                       </div>
                       <div>
-                        <Label>المجلس الصادر منه القرار</Label>
+                        <Label className="text-sm font-medium">المجلس الصادر منه القرار</Label>
                         <Select
                           value={formData.councilName}
                           onValueChange={(value) => setFormData({ ...formData, councilName: value })}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="w-full mt-1">
                             <SelectValue placeholder="اختر المجلس" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1626,15 +1636,15 @@ export function CasesSection() {
 
                         {party.role === 'plaintiff' ? (
                           <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div className="flex gap-2">
                                 <div className="flex-1">
-                                  <Label className="text-xs">الموكل</Label>
+                                  <Label className="text-xs font-medium">الموكل</Label>
                                   <Select
                                     value={party.clientId?.toString() || ''}
                                     onValueChange={(value) => updateParty(index, 'clientId', parseInt(value))}
                                   >
-                                    <SelectTrigger>
+                                    <SelectTrigger className="w-full mt-1">
                                       <SelectValue placeholder="اختر الموكل" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1661,67 +1671,73 @@ export function CasesSection() {
                                 </Button>
                               </div>
                               <div>
-                                <Label className="text-xs">بصفته</Label>
+                                <Label className="text-xs font-medium">بصفته</Label>
                                 <Input
                                   value={party.clientDescription || ''}
                                   onChange={(e) => updateParty(index, 'clientDescription', e.target.value)}
                                   placeholder="مثال: بصفته مدير الشركة"
+                                  className="w-full mt-1"
                                 />
                               </div>
                             </div>
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            <div className="grid grid-cols-4 gap-3">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               <div>
-                                <Label className="text-xs">الاسم</Label>
+                                <Label className="text-xs font-medium">الاسم</Label>
                                 <Input
                                   value={party.opponentFirstName || ''}
                                   onChange={(e) => updateParty(index, 'opponentFirstName', e.target.value)}
                                   placeholder="الاسم"
+                                  className="w-full mt-1"
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">اللقب</Label>
+                                <Label className="text-xs font-medium">اللقب</Label>
                                 <Input
                                   value={party.opponentLastName || ''}
                                   onChange={(e) => updateParty(index, 'opponentLastName', e.target.value)}
                                   placeholder="اللقب"
+                                  className="w-full mt-1"
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">رقم الهاتف</Label>
+                                <Label className="text-xs font-medium">رقم الهاتف</Label>
                                 <Input
                                   value={party.opponentPhone || ''}
                                   onChange={(e) => updateParty(index, 'opponentPhone', e.target.value)}
                                   placeholder="رقم الهاتف"
+                                  className="w-full mt-1"
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">الصفة</Label>
+                                <Label className="text-xs font-medium">الصفة</Label>
                                 <Input
                                   value={party.description || ''}
                                   onChange={(e) => updateParty(index, 'description', e.target.value)}
                                   placeholder="الصفة"
+                                  className="w-full mt-1"
                                 />
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <div>
-                                <Label className="text-xs">العنوان</Label>
+                                <Label className="text-xs font-medium">العنوان</Label>
                                 <Input
                                   value={party.opponentAddress || ''}
                                   onChange={(e) => updateParty(index, 'opponentAddress', e.target.value)}
                                   placeholder="العنوان"
+                                  className="w-full mt-1"
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">المحامي</Label>
+                                <Label className="text-xs font-medium">المحامي</Label>
                                 <Select
                                   value={party.lawyerId?.toString() || ''}
                                   onValueChange={(value) => updateParty(index, 'lawyerId', parseInt(value))}
                                 >
-                                  <SelectTrigger>
+                                  <SelectTrigger className="w-full mt-1">
                                     <SelectValue placeholder="اختر المحامي (اختياري)" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -1736,11 +1752,12 @@ export function CasesSection() {
                             </div>
                             {party.lawyerId && (
                               <div>
-                                <Label className="text-xs">المحامي بصفته</Label>
+                                <Label className="text-xs font-medium">المحامي بصفته</Label>
                                 <Input
                                   value={party.lawyerDescription || ''}
                                   onChange={(e) => updateParty(index, 'lawyerDescription', e.target.value)}
                                   placeholder="مثال: بصفته وكيل الخصم"
+                                  className="w-full mt-1"
                                 />
                               </div>
                             )}
@@ -1761,33 +1778,36 @@ export function CasesSection() {
               {/* القسم: معلومات إضافية */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-primary">معلومات إضافية</h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>الأتعاب (د.ج)</Label>
+                    <Label className="text-sm font-medium">الأتعاب (د.ج)</Label>
                     <Input
                       type="number"
                       value={formData.fees}
                       onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
                       placeholder="0"
+                      className="w-full mt-1"
                     />
                   </div>
                 </div>
                 <div>
-                  <Label>الموضوع</Label>
+                  <Label className="text-sm font-medium">الموضوع</Label>
                   <Textarea
                     value={formData.subject}
                     onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     placeholder="وصف موضوع القضية..."
                     rows={3}
+                    className="w-full mt-1"
                   />
                 </div>
                 <div>
-                  <Label>ملاحظات</Label>
+                  <Label className="text-sm font-medium">ملاحظات</Label>
                   <Textarea
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="ملاحظات إضافية..."
                     rows={2}
+                    className="w-full mt-1"
                   />
                 </div>
               </div>
@@ -2254,26 +2274,27 @@ export function CasesSection() {
                       </Button>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-muted-foreground">رقم القضية</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">رقم القضية</Label>
                         {editingBasicInfo ? (
                           <Input
                             value={basicInfoForm.caseNumber}
                             onChange={(e) => setBasicInfoForm({ ...basicInfoForm, caseNumber: e.target.value })}
+                            className="w-full mt-1"
                           />
                         ) : (
-                          <p className="font-medium">{detailsCase?.caseNumber || '-'}</p>
+                          <p className="font-medium mt-1">{detailsCase?.caseNumber || '-'}</p>
                         )}
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">نوع القضية</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">نوع القضية</Label>
                         {editingBasicInfo ? (
                           <Select
                             value={basicInfoForm.caseType}
                             onValueChange={(value) => setBasicInfoForm({ ...basicInfoForm, caseType: value })}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full mt-1">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2285,17 +2306,17 @@ export function CasesSection() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <p className="font-medium">{CASE_TYPE_LABELS[detailsCase?.caseType || ''] || '-'}</p>
+                          <p className="font-medium mt-1">{CASE_TYPE_LABELS[detailsCase?.caseType || ''] || '-'}</p>
                         )}
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">الحالة</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">الحالة</Label>
                         {editingBasicInfo ? (
                           <Select
                             value={basicInfoForm.status}
                             onValueChange={(value) => setBasicInfoForm({ ...basicInfoForm, status: value })}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full mt-1">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2312,67 +2333,70 @@ export function CasesSection() {
                         )}
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">الأتعاب</Label>
+                        <Label className="text-sm font-medium text-muted-foreground">الأتعاب</Label>
                         {editingBasicInfo ? (
                           <Input
                             type="number"
                             value={basicInfoForm.fees}
                             onChange={(e) => setBasicInfoForm({ ...basicInfoForm, fees: e.target.value })}
                             placeholder="0"
+                            className="w-full mt-1"
                           />
                         ) : (
-                          <p className="font-medium">
+                          <p className="font-medium mt-1">
                             {detailsCase?.fees ? `${detailsCase.fees.toLocaleString('ar-DZ')} د.ج` : '-'}
                           </p>
                         )}
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">الهيئة القضائية</Label>
-                        <p className="font-medium">{detailsCase?.judicialBody || '-'}</p>
+                        <Label className="text-sm font-medium text-muted-foreground">الهيئة القضائية</Label>
+                        <p className="font-medium mt-1">{detailsCase?.judicialBody || '-'}</p>
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">الغرفة</Label>
-                        <p className="font-medium">{detailsCase?.chamber || '-'}</p>
+                        <Label className="text-sm font-medium text-muted-foreground">الغرفة</Label>
+                        <p className="font-medium mt-1">{detailsCase?.chamber || '-'}</p>
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">الولاية</Label>
-                        <p className="font-medium">{detailsCase?.wilaya || '-'}</p>
+                        <Label className="text-sm font-medium text-muted-foreground">الولاية</Label>
+                        <p className="font-medium mt-1">{detailsCase?.wilaya || '-'}</p>
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">تاريخ التسجيل</Label>
-                        <p className="font-medium">{formatDate(detailsCase?.registrationDate)}</p>
+                        <Label className="text-sm font-medium text-muted-foreground">تاريخ التسجيل</Label>
+                        <p className="font-medium mt-1">{formatDate(detailsCase?.registrationDate)}</p>
                       </div>
                       <div>
-                        <Label className="text-muted-foreground">تاريخ أول جلسة</Label>
-                        <p className="font-medium">{formatDate(detailsCase?.firstSessionDate)}</p>
+                        <Label className="text-sm font-medium text-muted-foreground">تاريخ أول جلسة</Label>
+                        <p className="font-medium mt-1">{formatDate(detailsCase?.firstSessionDate)}</p>
                       </div>
                     </div>
                     
                     <Separator />
                     
                     <div>
-                      <Label className="text-muted-foreground">الموضوع</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">الموضوع</Label>
                       {editingBasicInfo ? (
                         <Textarea
                           value={basicInfoForm.subject}
                           onChange={(e) => setBasicInfoForm({ ...basicInfoForm, subject: e.target.value })}
                           rows={3}
+                          className="w-full mt-1"
                         />
                       ) : (
-                        <p className="font-medium">{detailsCase?.subject || '-'}</p>
+                        <p className="font-medium mt-1">{detailsCase?.subject || '-'}</p>
                       )}
                     </div>
                     
                     <div>
-                      <Label className="text-muted-foreground">ملاحظات</Label>
+                      <Label className="text-sm font-medium text-muted-foreground">ملاحظات</Label>
                       {editingBasicInfo ? (
                         <Textarea
                           value={basicInfoForm.notes}
                           onChange={(e) => setBasicInfoForm({ ...basicInfoForm, notes: e.target.value })}
                           rows={2}
+                          className="w-full mt-1"
                         />
                       ) : (
-                        <p className="font-medium">{detailsCase?.notes || '-'}</p>
+                        <p className="font-medium mt-1">{detailsCase?.notes || '-'}</p>
                       )}
                     </div>
                   </div>

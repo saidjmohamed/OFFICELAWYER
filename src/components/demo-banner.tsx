@@ -68,11 +68,9 @@ export function DemoBanner() {
 // مكون التذييل - شريط بسيط في الأسفل
 export function DemoFooter() {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white py-2 px-4 text-center text-xs">
-      <div className="flex items-center justify-center gap-2">
-        <AlertTriangle className="h-3 w-3" />
-        <span>نسخة تجريبية - بيانات اختبارية فقط</span>
-      </div>
+    <div className="hidden md:flex fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white py-2 px-4 text-center text-xs items-center justify-center gap-2">
+      <AlertTriangle className="h-3 w-3" />
+      <span>نسخة تجريبية - بيانات اختبارية فقط</span>
     </div>
   );
 }

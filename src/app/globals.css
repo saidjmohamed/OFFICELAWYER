@@ -327,6 +327,25 @@ button, a, [role="button"] {
     flex-direction: column;
     gap: 8px;
   }
+  
+  /* Dialog content improvements for mobile */
+  [role="dialog"] {
+    max-height: 95vh !important;
+    margin: 8px !important;
+    width: calc(100% - 16px) !important;
+  }
+  
+  /* Form sections spacing */
+  form > div {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  
+  /* Labels visibility */
+  label {
+    display: block;
+    margin-bottom: 4px;
+  }
 }
 
 /* Tablet adjustments */
