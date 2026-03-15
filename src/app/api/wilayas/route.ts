@@ -9,7 +9,7 @@ export async function GET() {
     const authenticated = cookieStore.get('authenticated');
 
     if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصارح' }, { status: 401 });
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
     }
 
     const wilayaList = await db.select().from(wilayas);

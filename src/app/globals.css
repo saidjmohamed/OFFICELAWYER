@@ -128,8 +128,9 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Better text rendering for Arabic */
+/* Arabic font as primary */
 body {
+  font-family: var(--font-tajawal), 'Tajawal', var(--font-geist-sans), system-ui, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -179,18 +180,18 @@ body {
   }
 }
 
-/* Card hover effects */
+/* Better card hover effects */
 .card-hover {
-  transition: all 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.1), 0 4px 8px -4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -6px rgba(0, 0, 0, 0.1);
 }
 
-/* Button hover animations */
-button {
+/* Improved transitions for all interactive elements */
+button, a, input, select, textarea, [role="button"] {
   transition: all 0.2s ease;
 }
 
@@ -198,10 +199,11 @@ button:active:not(:disabled) {
   transform: scale(0.98);
 }
 
-/* Focus ring styles */
-:focus-visible {
-  outline: 2px solid var(--ring);
+/* Smooth focus styles */
+*:focus-visible {
+  outline: 2px solid hsl(var(--primary));
   outline-offset: 2px;
+  transition: outline-offset 0.2s ease;
 }
 
 /* Gradient backgrounds for sections */

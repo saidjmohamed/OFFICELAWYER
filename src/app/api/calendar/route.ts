@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const authenticated = cookieStore.get('authenticated');
 
     if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصارح' }, { status: 401 });
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     const authenticated = cookieStore.get('authenticated');
 
     if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصارح' }, { status: 401 });
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
     }
 
     const body = await request.json();
@@ -178,7 +178,7 @@ export async function DELETE(request: NextRequest) {
     const authenticated = cookieStore.get('authenticated');
 
     if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصارح' }, { status: 401 });
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
     }
 
     const searchParams = request.nextUrl.searchParams;

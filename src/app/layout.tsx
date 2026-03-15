@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 const tajawal = Tajawal({
   variable: "--font-tajawal",
   subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "700", "800"],
+  weight: ["200", "300", "400", "500", "700", "800", "900"],
   display: "swap",
 });
 
