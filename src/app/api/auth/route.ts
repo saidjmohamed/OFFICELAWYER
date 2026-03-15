@@ -13,7 +13,7 @@ const SESSION_DURATION_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
 // ===== تحديد معدل المحاولات =====
 const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
 
-function checkRateLimit(ip: string): boolean {
+function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   const now = Date.now();
   const lockoutMs = DEFAULT_VALUES.LOCKOUT_DURATION_MINUTES * 60 * 1000;
   const record = loginAttempts.get(ip);
@@ -22,11 +22,15 @@ function checkRateLimit(ip: string): boolean {
     // إعادة تعيين إذا انتهت فترة الحظر
     if (now - record.firstAttempt > lockoutMs) {
       loginAttempts.delete(ip);
-      return true;
+      return { allowed: true };
     }
-    return record.count < DEFAULT_VALUES.MAX_LOGIN_ATTEMPTS;
+    if (record.count >= DEFAULT_VALUES.MAX_LOGIN_ATTEMPTS) {
+      const retryAfter = Math.ceil((record.firstAttempt + lockoutMs - now) / 1000);
+      return { allowed: false, retryAfter };
+    }
+    return { allowed: true };
   }
-  return true;
+  return { allowed: true };
 }
 
 function recordLoginAttempt(ip: string): void {
@@ -43,6 +47,23 @@ function clearLoginAttempts(ip: string): void {
   loginAttempts.delete(ip);
 }
 
+// تنظيف تلقائي للسجلات القديمة كل دقيقة لمنع تسرب الذاكرة
+if (typeof globalThis !== 'undefined') {
+  const CLEANUP_INTERVAL = 60 * 1000;
+  const cleanupKey = '__rateLimitCleanup';
+  if (!(globalThis as any)[cleanupKey]) {
+    (globalThis as any)[cleanupKey] = setInterval(() => {
+      const now = Date.now();
+      const lockoutMs = DEFAULT_VALUES.LOCKOUT_DURATION_MINUTES * 60 * 1000;
+      for (const [ip, record] of loginAttempts.entries()) {
+        if (now - record.firstAttempt > lockoutMs) {
+          loginAttempts.delete(ip);
+        }
+      }
+    }, CLEANUP_INTERVAL);
+  }
+}
+
 /**
  * POST - تسجيل الدخول (باسم المستخدم أو الرمز)
  */
@@ -52,10 +73,14 @@ export async function POST(request: NextRequest) {
     const headersList = await headers();
     const clientIp = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() || headersList.get('x-real-ip') || 'unknown';
 
-    if (!checkRateLimit(clientIp)) {
+    const rateCheck = checkRateLimit(clientIp);
+    if (!rateCheck.allowed) {
       return NextResponse.json(
-        { success: false, error: ERROR_MESSAGES.RATE_LIMIT_EXCEEDED },
-        { status: HTTP_STATUS.TOO_MANY_REQUESTS }
+        { success: false, error: `${ERROR_MESSAGES.RATE_LIMIT_EXCEEDED}. حاول بعد ${rateCheck.retryAfter} ثانية` },
+        { 
+          status: HTTP_STATUS.TOO_MANY_REQUESTS,
+          headers: { 'Retry-After': String(rateCheck.retryAfter || 900) }
+        }
       );
     }
 

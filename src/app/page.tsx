@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense, useCallback } from 'react';
+import { useEffect, useState, Suspense, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { LoginForm } from '@/components/auth/login-form';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -71,8 +71,10 @@ function MainContent() {
           <SessionNotifications />
         </div>
         
-        {/* Content */}
-        {renderSection()}
+        {/* Content with smooth transition */}
+        <div key={section} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {renderSection()}
+        </div>
       </div>
     </main>
   );
@@ -112,10 +114,13 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-muted-foreground">جاري التحميل...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/50 to-muted">
+        <div className="flex flex-col items-center gap-4 animate-in fade-in duration-500">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+            <Loader2 className="h-10 w-10 animate-spin text-primary relative" />
+          </div>
+          <p className="text-muted-foreground text-sm">جاري التحميل...</p>
         </div>
       </div>
     );
@@ -123,15 +128,17 @@ export default function Home() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
-        <LoginForm onLoginSuccess={handleLoginSuccess} />
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-muted/50 to-muted">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <LoginForm onLoginSuccess={handleLoginSuccess} />
+        </div>
       </div>
     );
   }
 
   return (
     <ThemeProvider>
-      <div className="min-h-screen flex">
+      <div className="min-h-screen flex animate-in fade-in duration-300">
         <Sidebar />
         <div className="flex-1 md:mr-64">
           <Suspense fallback={
