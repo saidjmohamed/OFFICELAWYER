@@ -1,23 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { clients } from '@/db/schema';
-import { eq, like, or, ilike, sql, desc } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { eq, or, sql, desc } from 'drizzle-orm';
+import { requireAuth } from '@/lib/helpers';
+import { z } from 'zod';
+
+// مخطط التحقق لإنشاء/تحديث موكل
+const clientSchema = z.object({
+  fullName: z.string().min(1, 'اسم الموكل مطلوب'),
+  phone: z.string().optional().nullable(),
+  address: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  clientType: z.enum(['natural_person', 'legal_entity']).optional(),
+  businessName: z.string().optional().nullable(),
+  legalRepresentative: z.string().optional().nullable(),
+});
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     const search = searchParams.get('search');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = (page - 1) * limit;
 
     if (id) {
@@ -58,14 +66,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const body = await request.json();
+
+    // التحقق من صحة البيانات
+    const validation = clientSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'بيانات غير صالحة', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
     const { fullName, phone, address, notes, clientType, businessName, legalRepresentative } = body;
 
     const [newClient] = await db.insert(clients)
@@ -89,14 +103,20 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const body = await request.json();
+
+    // التحقق من صحة البيانات
+    const validation = clientSchema.partial().extend({ id: z.number() }).safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'بيانات غير صالحة', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
     const { id, fullName, phone, address, notes, clientType, businessName, legalRepresentative } = body;
 
     if (!id) {
@@ -126,12 +146,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');

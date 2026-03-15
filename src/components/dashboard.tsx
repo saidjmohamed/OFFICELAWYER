@@ -103,10 +103,11 @@ const itemVariants = {
 };
 
 const cardHoverVariants = {
-  rest: { scale: 1 },
-  hover: { 
+  rest: { scale: 1, y: 0 },
+  hover: {
     scale: 1.02,
-    transition: { duration: 0.2 }
+    y: -4,
+    transition: { duration: 0.3, ease: 'easeOut' }
   }
 };
 
@@ -214,7 +215,7 @@ function StatsCard({
         whileHover="hover"
         className="h-full"
       >
-        <Card className="card-hover border-none shadow-soft overflow-hidden h-full">
+        <Card className="card-hover border-none shadow-soft hover:shadow-elevated overflow-hidden h-full">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <motion.div 

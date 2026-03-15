@@ -2,6 +2,46 @@
  * دوال مساعدة عامة
  */
 
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { db } from '@/db';
+import { userSessions } from '@/db/schema';
+import { eq, and, gt } from 'drizzle-orm';
+
+// ===== المصادقة =====
+
+/**
+ * التحقق من المصادقة في مسارات API
+ * يدعم كلا من جلسات المستخدمين الجديدة والمصادقة القديمة (passcode)
+ */
+export async function requireAuth(): Promise<{ authenticated: true } | NextResponse> {
+  const cookieStore = await cookies();
+
+  // التحقق من جلسة المستخدم الجديدة
+  const sessionId = cookieStore.get('session_id')?.value;
+  if (sessionId) {
+    const session = await db.select()
+      .from(userSessions)
+      .where(and(
+        eq(userSessions.id, sessionId),
+        gt(userSessions.expiresAt, new Date())
+      ))
+      .limit(1);
+
+    if (session.length > 0) {
+      return { authenticated: true };
+    }
+  }
+
+  // التحقق من المصادقة القديمة (passcode) - للتوافق الخلفي
+  const authenticated = cookieStore.get('authenticated')?.value;
+  if (authenticated === 'true') {
+    return { authenticated: true };
+  }
+
+  return NextResponse.json({ error: 'غير مصرح بالوصول' }, { status: 401 });
+}
+
 // ===== تنسيق التواريخ =====
 
 /**

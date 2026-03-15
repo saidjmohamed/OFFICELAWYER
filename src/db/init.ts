@@ -129,7 +129,7 @@ export async function createTables() {
     CREATE TABLE IF NOT EXISTS judicial_bodies (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('supreme_court', 'judicial_council', 'court', 'admin_appeal_court', 'admin_court', 'commercial_court')),
+      type TEXT NOT NULL CHECK(type IN ('supreme_court', 'state_council', 'judicial_council', 'court', 'admin_appeal_court', 'admin_court', 'commercial_court')),
       wilaya_id INTEGER REFERENCES wilayas(id),
       parent_id INTEGER REFERENCES judicial_bodies(id),
       created_at INTEGER DEFAULT (strftime('%s', 'now') * 1000),

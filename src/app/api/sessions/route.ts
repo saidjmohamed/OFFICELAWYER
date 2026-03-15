@@ -1,29 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { sessions, cases } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { eq, desc, sql } from 'drizzle-orm';
+import { requireAuth } from '@/lib/helpers';
 
 // الحصول على جلسات قضية أو جميع الجلسات
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصارح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const caseId = request.nextUrl.searchParams.get('caseId');
     const id = request.nextUrl.searchParams.get('id');
+    const page = parseInt(request.nextUrl.searchParams.get('page') || '1');
+    const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '20'), 100);
+    const offset = (page - 1) * limit;
 
     if (id) {
       const session = await db.select().from(sessions).where(eq(sessions.id, parseInt(id))).limit(1);
       return NextResponse.json(session[0] || null);
     }
 
-    // جلب كل الجلسات مع بيانات القضية
-    const allSessions = await db
+    // بناء شرط التصفية
+    const whereClause = caseId ? eq(sessions.caseId, parseInt(caseId)) : undefined;
+
+    // جلب العدد الإجمالي
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(sessions)
+      .where(whereClause);
+    const total = countResult[0]?.count || 0;
+
+    // جلب الجلسات مع بيانات القضية
+    let query = db
       .select({
         id: sessions.id,
         caseId: sessions.caseId,
@@ -40,9 +48,22 @@ export async function GET(request: NextRequest) {
       })
       .from(sessions)
       .leftJoin(cases, eq(sessions.caseId, cases.id))
-      .orderBy(desc(sessions.sessionDate));
+      .where(whereClause)
+      .orderBy(desc(sessions.sessionDate))
+      .limit(limit)
+      .offset(offset);
 
-    return NextResponse.json(allSessions);
+    const allSessions = await query;
+
+    return NextResponse.json({
+      data: allSessions,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     console.error('خطأ في جلب الجلسات:', error);
     return NextResponse.json({ error: 'حدث خطأ في جلب الجلسات' }, { status: 500 });
@@ -52,6 +73,9 @@ export async function GET(request: NextRequest) {
 // إضافة جلسة جديدة
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+
     const body = await request.json();
     const { caseId, sessionDate, adjournmentReason, decision, rulingText, notes } = body;
 
@@ -80,6 +104,9 @@ export async function POST(request: NextRequest) {
 // تحديث جلسة
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+
     const body = await request.json();
     const { id, sessionDate, adjournmentReason, decision, rulingText, notes } = body;
 
@@ -109,8 +136,11 @@ export async function PUT(request: NextRequest) {
 // حذف جلسة
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
+
     const id = request.nextUrl.searchParams.get('id');
-    
+
     if (!id) {
       return NextResponse.json({ error: 'معرف الجلسة مطلوب' }, { status: 400 });
     }

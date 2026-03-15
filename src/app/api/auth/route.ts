@@ -4,17 +4,61 @@ import { settings, users, roles, rolePermissions, permissions, userSessions } fr
 import { eq, and, gt } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';
 import { hashPassword, verifyPassword, generateSessionId, setSessionCookie, clearSessionCookie } from '@/services/auth.service';
-import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants';
+import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES, DEFAULT_VALUES } from '@/constants';
 
 // مدة صلاحية الجلسة (7 أيام)
 const SESSION_DURATION_DAYS = 7;
 const SESSION_DURATION_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000;
+
+// ===== تحديد معدل المحاولات =====
+const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const lockoutMs = DEFAULT_VALUES.LOCKOUT_DURATION_MINUTES * 60 * 1000;
+  const record = loginAttempts.get(ip);
+
+  if (record) {
+    // إعادة تعيين إذا انتهت فترة الحظر
+    if (now - record.firstAttempt > lockoutMs) {
+      loginAttempts.delete(ip);
+      return true;
+    }
+    return record.count < DEFAULT_VALUES.MAX_LOGIN_ATTEMPTS;
+  }
+  return true;
+}
+
+function recordLoginAttempt(ip: string): void {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+  if (record) {
+    record.count++;
+  } else {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now });
+  }
+}
+
+function clearLoginAttempts(ip: string): void {
+  loginAttempts.delete(ip);
+}
 
 /**
  * POST - تسجيل الدخول (باسم المستخدم أو الرمز)
  */
 export async function POST(request: NextRequest) {
   try {
+    // التحقق من تحديد معدل المحاولات
+    const headersList = await headers();
+    const clientIp = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() || headersList.get('x-real-ip') || 'unknown';
+
+    if (!checkRateLimit(clientIp)) {
+      return NextResponse.json(
+        { success: false, error: ERROR_MESSAGES.RATE_LIMIT_EXCEEDED },
+        { status: HTTP_STATUS.TOO_MANY_REQUESTS }
+      );
+    }
+
     const body = await request.json();
     const { username, password, passcode, action } = body;
 
@@ -25,12 +69,12 @@ export async function POST(request: NextRequest) {
 
     // === تسجيل الدخول باسم المستخدم وكلمة المرور ===
     if (username && password) {
-      return await handleUsernameLogin(username, password);
+      return await handleUsernameLogin(username, password, clientIp);
     }
 
     // === تسجيل الدخول بالرمز (للتوافق مع النظام القديم) ===
     if (passcode) {
-      return await handlePasscodeLogin(passcode);
+      return await handlePasscodeLogin(passcode, clientIp);
     }
 
     return NextResponse.json(
@@ -50,7 +94,7 @@ export async function POST(request: NextRequest) {
 /**
  * تسجيل الدخول باسم المستخدم وكلمة المرور
  */
-async function handleUsernameLogin(username: string, password: string) {
+async function handleUsernameLogin(username: string, password: string, clientIp: string) {
   // البحث عن المستخدم
   const userResult = await db.select({
     id: users.id,
@@ -66,6 +110,7 @@ async function handleUsernameLogin(username: string, password: string) {
     .limit(1);
 
   if (userResult.length === 0) {
+    recordLoginAttempt(clientIp);
     return NextResponse.json(
       { success: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' },
       { status: HTTP_STATUS.UNAUTHORIZED }
@@ -92,11 +137,15 @@ async function handleUsernameLogin(username: string, password: string) {
   // التحقق من كلمة المرور
   const isValidPassword = await verifyPassword(password, user.password);
   if (!isValidPassword) {
+    recordLoginAttempt(clientIp);
     return NextResponse.json(
       { success: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' },
       { status: HTTP_STATUS.UNAUTHORIZED }
     );
   }
+
+  // مسح سجل المحاولات الفاشلة بعد تسجيل دخول ناجح
+  clearLoginAttempts(clientIp);
 
   // جلب دور المستخدم وصلاحياته
   let roleData: { name: string; nameAr: string } | null = null;
@@ -167,7 +216,7 @@ async function handleUsernameLogin(username: string, password: string) {
 /**
  * تسجيل الدخول بالرمز (للتوافق مع النظام القديم)
  */
-async function handlePasscodeLogin(passcode: string) {
+async function handlePasscodeLogin(passcode: string, clientIp: string) {
   if (!passcode || passcode.length !== 6) {
     return NextResponse.json(
       { success: false, error: 'الرمز يجب أن يكون 6 أرقام' },
@@ -186,6 +235,7 @@ async function handlePasscodeLogin(passcode: string) {
   }
 
   if (storedPasscode[0].value === passcode) {
+    clearLoginAttempts(clientIp);
     // تعيين جلسة المصادقة القديمة
     const cookieStore = await cookies();
     cookieStore.set('authenticated', 'true', {
@@ -198,6 +248,7 @@ async function handlePasscodeLogin(passcode: string) {
     return NextResponse.json({ success: true });
   }
 
+  recordLoginAttempt(clientIp);
   return NextResponse.json(
     { success: false, error: 'رمز غير صحيح' },
     { status: HTTP_STATUS.UNAUTHORIZED }

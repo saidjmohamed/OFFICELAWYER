@@ -147,6 +147,10 @@ export const cases = sqliteTable('cases', {
   // استئناف
   originalCaseNumber: text('original_case_number'),
   originalCourt: text('original_court'),
+  // طعن بالنقض
+  originalJudgmentDate: integer('original_judgment_date', { mode: 'timestamp' }),
+  councilDecisionDate: integer('council_decision_date', { mode: 'timestamp' }),
+  councilName: text('council_name'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });

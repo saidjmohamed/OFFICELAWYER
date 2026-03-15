@@ -1,24 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { cases, caseClients, clients, judicialBodies, chambers, wilayas, lawyers, organizations } from '@/db/schema';
-import { eq, ilike, or, sql, desc, and, inArray } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { eq, or, sql, desc, and, inArray } from 'drizzle-orm';
+import { requireAuth } from '@/lib/helpers';
+import { z } from 'zod';
+
+// مخطط التحقق لإنشاء/تحديث قضية
+const caseSchema = z.object({
+  caseNumber: z.string().optional().nullable(),
+  caseType: z.string().optional().nullable(),
+  judicialBodyId: z.union([z.string(), z.number()]).optional().nullable(),
+  chamberId: z.union([z.string(), z.number()]).optional().nullable(),
+  wilayaId: z.union([z.string(), z.number()]).optional().nullable(),
+  registrationDate: z.string().optional().nullable(),
+  firstSessionDate: z.string().optional().nullable(),
+  subject: z.string().optional().nullable(),
+  status: z.enum(['active', 'adjourned', 'judged', 'closed', 'archived']).optional(),
+  fees: z.union([z.string(), z.number()]).optional().nullable(),
+  notes: z.string().optional().nullable(),
+  judgmentNumber: z.string().optional().nullable(),
+  judgmentDate: z.string().optional().nullable(),
+  issuingCourt: z.string().optional().nullable(),
+  originalCaseNumber: z.string().optional().nullable(),
+  originalCourt: z.string().optional().nullable(),
+  parties: z.array(z.any()).optional(),
+});
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = (page - 1) * limit;
 
     if (id) {
@@ -66,16 +84,17 @@ export async function GET(request: NextRequest) {
 
     // جلب قائمة القضايا
     let conditions = [];
-    
+
     if (status) {
       conditions.push(eq(cases.status, status as 'active' | 'adjourned' | 'judged' | 'closed'));
     }
 
     if (search) {
+      const searchLower = search.toLowerCase();
       conditions.push(
         or(
-          ilike(cases.caseNumber, `%${search}%`),
-          ilike(cases.subject, `%${search}%`)
+          sql`lower(${cases.caseNumber}) LIKE ${`%${searchLower}%`}`,
+          sql`lower(${cases.subject}) LIKE ${`%${searchLower}%`}`
         )
       );
     }
@@ -107,7 +126,7 @@ export async function GET(request: NextRequest) {
     // جلب أطراف القضايا لكل قضية
     const caseIds = caseList.map(c => c.id);
     let partiesByCase: Record<number, any[]> = {};
-    
+
     if (caseIds.length > 0) {
       const allParties = await db.select({
         caseId: caseClients.caseId,
@@ -121,7 +140,7 @@ export async function GET(request: NextRequest) {
         .from(caseClients)
         .leftJoin(clients, eq(caseClients.clientId, clients.id))
         .where(inArray(caseClients.caseId, caseIds));
-      
+
       for (const party of allParties) {
         if (!partiesByCase[party.caseId]) {
           partiesByCase[party.caseId] = [];
@@ -138,7 +157,7 @@ export async function GET(request: NextRequest) {
       defendants: (partiesByCase[c.id] || []).filter(p => p.role === 'defendant'),
     }));
 
-    const countResult = await db.select({ count: sql<number>`count(*)` }).from(cases);
+    const countResult = await db.select({ count: sql<number>`count(*)` }).from(cases).where(whereClause);
     const total = countResult[0]?.count || 0;
 
     return NextResponse.json({ data: casesWithParties, total, page, limit });
@@ -150,15 +169,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const body = await request.json();
-    
+
+    // التحقق من صحة البيانات
+    const validation = caseSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'بيانات غير صالحة', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
     const {
       caseNumber,
       caseType,
@@ -261,14 +285,20 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const body = await request.json();
+
+    // التحقق من صحة البيانات
+    const validation = caseSchema.extend({ id: z.number() }).safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'بيانات غير صالحة', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
     const {
       id,
       caseNumber,
@@ -306,7 +336,7 @@ export async function PUT(request: NextRequest) {
 
     // بناء كائن التحديث بالحقول المرسلة فقط
     const updateData: Record<string, any> = { updatedAt: new Date() };
-    
+
     if (caseNumber !== undefined) updateData.caseNumber = caseNumber || null;
     if (caseType !== undefined) updateData.caseType = caseType || null;
     if (judicialBodyId !== undefined) updateData.judicialBodyId = judicialBodyId ? parseInt(judicialBodyId) : null;
@@ -332,7 +362,7 @@ export async function PUT(request: NextRequest) {
     // تحديث أطراف القضية
     if (parties !== undefined) {
       await db.delete(caseClients).where(eq(caseClients.caseId, id));
-      
+
       if (Array.isArray(parties) && parties.length > 0) {
         const partyValues = parties
           .filter((party: any) => {
@@ -372,12 +402,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
