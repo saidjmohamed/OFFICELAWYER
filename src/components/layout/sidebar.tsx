@@ -151,8 +151,8 @@ function SidebarContent({ activeSection, onNavigate, onLogout, officeSettings }:
         href={item.href}
         onClick={onNavigate}
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-300 ease-out',
-          'hover:shadow-md hover:translate-x-[-2px]',
+          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-out',
+          'hover:shadow-md hover:translate-x-[-2px] active:scale-[0.98]',
           isActive
             ? 'bg-primary text-primary-foreground shadow-md'
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -329,18 +329,19 @@ export function Sidebar() {
       </Button>
 
       {/* Mobile sidebar overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-      
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden transition-opacity duration-300',
+          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        )}
+        onClick={() => setMobileOpen(false)}
+      />
+
       {/* Mobile sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 right-0 z-40 w-64 transform border-l bg-card shadow-elevated transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:hidden',
-          mobileOpen ? 'translate-x-0' : 'translate-x-full'
+          'fixed inset-y-0 right-0 z-40 w-64 transform border-l bg-card shadow-elevated transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:hidden',
+          mobileOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
         )}
       >
         <SidebarContent

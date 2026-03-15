@@ -1,6 +1,10 @@
 /**
  * Middleware للمصادقة والأمان
  * يعمل على حماية مسارات API والتحقق من الجلسات
+ *
+ * ملاحظة: هذا الـ middleware يعمل في بيئة Edge Runtime ولا يمكنه الوصول لقاعدة البيانات.
+ * التحقق الكامل من صلاحية الجلسة (session_id) يتم في requireAuth() داخل مسارات API.
+ * هنا نتحقق فقط من وجود cookie للمصادقة كطبقة حماية أولى.
  */
 
 import { NextResponse } from 'next/server';
@@ -36,8 +40,11 @@ export function middleware(request: NextRequest) {
   // حماية مسارات API
   if (pathname.startsWith('/api/')) {
     // التحقق من وجود جلسة مستخدم (الطريقة المفضلة)
+    // التحقق الكامل من صلاحية الجلسة يتم في requireAuth()
     const sessionId = request.cookies.get('session_id')?.value;
-    // التحقق من cookie المصادقة القديمة (للتوافق الخلفي - سيتم إزالته لاحقاً)
+
+    // @deprecated التحقق من cookie المصادقة القديمة (passcode) - للتوافق الخلفي فقط
+    // سيتم إزالة هذا التحقق في إصدار مستقبلي لصالح نظام الجلسات الجديد
     const authenticated = request.cookies.get('authenticated')?.value;
 
     if (!sessionId && authenticated !== 'true') {
@@ -60,7 +67,7 @@ export function middleware(request: NextRequest) {
   // منع كشف نوع المحتوى
   response.headers.set('X-Content-Type-Options', 'nosniff');
 
-  // سياسة أمنية للمحتوى
+  // سياسة أمنية للمحتوى - بدون unsafe-eval لمنع تنفيذ الكود الديناميكي
   response.headers.set(
     'Content-Security-Policy',
     "default-src 'self'; " +
@@ -68,11 +75,24 @@ export function middleware(request: NextRequest) {
     "style-src 'self' 'unsafe-inline'; " +
     "img-src 'self' data: blob:; " +
     "font-src 'self' data:; " +
-    "connect-src 'self';"
+    "connect-src 'self'; " +
+    "frame-ancestors 'none';"
   );
 
   // Referrer Policy
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  // Permissions Policy - تقييد الوصول للميزات الحساسة
+  response.headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=()'
+  );
+
+  // Strict Transport Security
+  response.headers.set(
+    'Strict-Transport-Security',
+    'max-age=31536000; includeSubDomains'
+  );
 
   return response;
 }
