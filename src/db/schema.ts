@@ -97,8 +97,11 @@ export const clients = sqliteTable('clients', {
 export const organizations = sqliteTable('organizations', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name'),
+  // FIX 13: Add judicial_council and court to match seed data and UI
   type: text('type', { enum: [
     'bar_association',      // نقابة محامين
+    'judicial_council',     // مجلس قضائي
+    'court',                // محكمة
     'other'                 // أخرى
   ] }),
   address: text('address'),
@@ -143,6 +146,10 @@ export const cases = sqliteTable('cases', {
   // استئناف
   originalCaseNumber: text('original_case_number'),
   originalCourt: text('original_court'),
+  // FIX 12: Add missing columns that exist in init.ts SQL
+  originalJudgmentDate: integer('original_judgment_date', { mode: 'timestamp' }),
+  councilDecisionDate: integer('council_decision_date', { mode: 'timestamp' }),
+  councilName: text('council_name'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });

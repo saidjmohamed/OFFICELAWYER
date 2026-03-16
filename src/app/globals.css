@@ -6,7 +6,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-tajawal), var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -519,6 +519,112 @@ input:focus, textarea:focus, select:focus {
 
 .shadow-elevated {
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+/* FIX 27: Page transition animations */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: page-enter 0.3s ease-out forwards;
+}
+
+/* FIX 28: Dashboard card hover effects */
+.dashboard-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: linear-gradient(135deg, oklch(0.45 0.18 250 / 0.03), oklch(0.55 0.15 200 / 0.03));
+  pointer-events: none;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.12), 0 6px 12px -4px rgba(0, 0, 0, 0.06);
+}
+
+.dashboard-card:hover::after {
+  opacity: 1;
+}
+
+/* FIX 29: Sidebar animations */
+@keyframes sidebar-item-enter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sidebar-animate-item {
+  animation: sidebar-item-enter 0.25s ease-out forwards;
+}
+
+.sidebar-nav-item {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.sidebar-nav-item:hover {
+  transform: translateX(-2px);
+}
+
+.sidebar-nav-item.active::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  background: var(--primary);
+  border-radius: 2px;
+}
+
+/* FIX 26: Enhanced focus & selection */
+::selection {
+  background: oklch(0.45 0.18 250 / 0.2);
+  color: oklch(0.15 0.02 260);
+}
+
+.dark ::selection {
+  background: oklch(0.6 0.18 250 / 0.3);
+  color: oklch(0.96 0.005 250);
+}
+
+/* FIX 26: Smooth skeleton loading */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--muted) 25%, oklch(0.95 0.005 250) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 /* Print styles */

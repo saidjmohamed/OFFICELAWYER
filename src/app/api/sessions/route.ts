@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { sessions, cases } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+// FIX 19: Zod validation
+import { sessionSchema, sessionUpdateSchema } from '@/lib/validations';
 
 // الحصول على جلسات قضية أو جميع الجلسات
 export async function GET(request: NextRequest) {
@@ -16,14 +18,18 @@ export async function GET(request: NextRequest) {
 
     const caseId = request.nextUrl.searchParams.get('caseId');
     const id = request.nextUrl.searchParams.get('id');
+    // FIX 20: Pagination support
+    const page = parseInt(request.nextUrl.searchParams.get('page') || '1');
+    const limit = parseInt(request.nextUrl.searchParams.get('limit') || '20');
+    const offset = (page - 1) * limit;
 
     if (id) {
       const session = await db.select().from(sessions).where(eq(sessions.id, parseInt(id))).limit(1);
       return NextResponse.json(session[0] || null);
     }
 
-    // جلب كل الجلسات مع بيانات القضية
-    const allSessions = await db
+    // جلب الجلسات مع بيانات القضية
+    let query = db
       .select({
         id: sessions.id,
         caseId: sessions.caseId,
@@ -39,10 +45,26 @@ export async function GET(request: NextRequest) {
         caseStatus: cases.status,
       })
       .from(sessions)
-      .leftJoin(cases, eq(sessions.caseId, cases.id))
-      .orderBy(desc(sessions.sessionDate));
+      .leftJoin(cases, eq(sessions.caseId, cases.id));
 
-    return NextResponse.json(allSessions);
+    // Filter by caseId if provided
+    if (caseId) {
+      query = query.where(eq(sessions.caseId, parseInt(caseId))) as any;
+    }
+
+    const allSessions = await query
+      .orderBy(desc(sessions.sessionDate))
+      .limit(limit)
+      .offset(offset);
+
+    // FIX 20: Get total count
+    const countQuery = caseId
+      ? db.select({ count: sql<number>`count(*)` }).from(sessions).where(eq(sessions.caseId, parseInt(caseId)))
+      : db.select({ count: sql<number>`count(*)` }).from(sessions);
+    const countResult = await countQuery;
+    const total = countResult[0]?.count || 0;
+
+    return NextResponse.json({ data: allSessions, total, page, limit });
   } catch (error) {
     console.error('خطأ في جلب الجلسات:', error);
     return NextResponse.json({ error: 'حدث خطأ في جلب الجلسات' }, { status: 500 });
@@ -52,7 +74,20 @@ export async function GET(request: NextRequest) {
 // إضافة جلسة جديدة
 export async function POST(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const body = await request.json();
+
+    // FIX 19: Validate input with Zod
+    const parsed = sessionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'بيانات غير صالحة', details: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const { caseId, sessionDate, adjournmentReason, decision, rulingText, notes } = body;
 
     if (!caseId) {
@@ -80,7 +115,20 @@ export async function POST(request: NextRequest) {
 // تحديث جلسة
 export async function PUT(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const body = await request.json();
+
+    // FIX 19: Validate input with Zod
+    const parsed = sessionUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'بيانات غير صالحة', details: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const { id, sessionDate, adjournmentReason, decision, rulingText, notes } = body;
 
     if (!id) {
@@ -109,6 +157,12 @@ export async function PUT(request: NextRequest) {
 // حذف جلسة
 export async function DELETE(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const id = request.nextUrl.searchParams.get('id');
     
     if (!id) {

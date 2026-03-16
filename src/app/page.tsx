@@ -65,8 +65,10 @@ function MainContent() {
           <GlobalSearch />
         </div>
         
-        {/* Content */}
-        {renderSection()}
+        {/* FIX 27: Content with page transition */}
+        <div key={section} className="page-transition">
+          {renderSection()}
+        </div>
       </div>
     </main>
   );

@@ -135,10 +135,10 @@ function SidebarContent({ activeSection, onNavigate, onLogout, officeSettings }:
         href={item.href}
         onClick={onNavigate}
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+          'sidebar-nav-item flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
           'hover:shadow-sm',
           isActive
-            ? 'bg-primary text-primary-foreground shadow-sm'
+            ? 'active bg-primary text-primary-foreground shadow-sm'
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         )}
       >

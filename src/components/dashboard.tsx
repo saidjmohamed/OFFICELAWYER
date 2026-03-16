@@ -393,9 +393,9 @@ export function Dashboard() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {cards.map((card, index) => (
-          <Card 
-            key={card.title} 
-            className={`card-hover border-none shadow-soft overflow-hidden ${card.highlight ? 'ring-2 ring-emerald-400' : ''}`}
+          <Card
+            key={card.title}
+            className={`dashboard-card border-none shadow-soft overflow-hidden ${card.highlight ? 'ring-2 ring-emerald-400' : ''}`}
             style={{ animationDelay: `${index * 100}ms` }}
           >
             <CardHeader className="pb-3">

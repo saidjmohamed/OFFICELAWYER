@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { cases, caseClients, clients, judicialBodies, chambers, wilayas, lawyers, organizations } from '@/db/schema';
-import { eq, ilike, or, sql, desc, and } from 'drizzle-orm';
+import { eq, or, sql, desc, and } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+// FIX 19: Zod validation
+import { caseSchema, caseUpdateSchema } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,10 +24,16 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     if (id) {
+      // FIX 23: Validate parseInt
+      const parsedId = parseInt(id);
+      if (isNaN(parsedId)) {
+        return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+      }
+
       // جلب تفاصيل قضية واحدة
       const caseResult = await db.select()
         .from(cases)
-        .where(eq(cases.id, parseInt(id)));
+        .where(eq(cases.id, parsedId));
 
       if (caseResult.length === 0) {
         return NextResponse.json(null);
@@ -56,7 +64,7 @@ export async function GET(request: NextRequest) {
         .leftJoin(clients, eq(caseClients.clientId, clients.id))
         .leftJoin(lawyers, eq(caseClients.lawyerId, lawyers.id))
         .leftJoin(organizations, eq(lawyers.organizationId, organizations.id))
-        .where(eq(caseClients.caseId, parseInt(id)));
+        .where(eq(caseClients.caseId, parsedId));
 
       return NextResponse.json({
         ...caseItem,
@@ -111,7 +119,13 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
-    const countResult = await db.select({ count: sql<number>`count(*)` }).from(cases);
+    // FIX 11: Apply whereClause to count query so it matches the filtered list
+    const countQuery = db.select({ count: sql<number>`count(*)` })
+      .from(cases)
+      .leftJoin(judicialBodies, eq(cases.judicialBodyId, judicialBodies.id));
+    const countResult = whereClause
+      ? await countQuery.where(whereClause)
+      : await countQuery;
     const total = countResult[0]?.count || 0;
 
     return NextResponse.json({ data: caseList, total, page, limit });
@@ -131,7 +145,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    
+
+    // FIX 19: Validate input with Zod
+    const parsed = caseSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'بيانات غير صالحة', details: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const {
       caseNumber,
       caseType,
@@ -174,55 +194,60 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    const [newCase] = await db.insert(cases)
-      .values({
-        caseNumber: caseNumber || null,
-        caseType: caseType || null,
-        judicialBodyId: parseOptionalInt(judicialBodyId),
-        chamberId: parseOptionalInt(chamberId),
-        wilayaId: parseOptionalInt(wilayaId),
-        registrationDate: parseOptionalDate(registrationDate),
-        firstSessionDate: parseOptionalDate(firstSessionDate),
-        subject: subject || null,
-        status: status || 'active',
-        fees: parseOptionalFloat(fees),
-        notes: notes || null,
-        judgmentNumber: judgmentNumber || null,
-        judgmentDate: parseOptionalDate(judgmentDate),
-        issuingCourt: issuingCourt || null,
-        originalCaseNumber: originalCaseNumber || null,
-        originalCourt: originalCourt || null,
-      })
-      .returning();
-
-    // إضافة أطراف القضية
-    if (parties && Array.isArray(parties) && parties.length > 0) {
-      const partyValues = parties
-        .filter((party: any) => {
-          if (party.role === 'plaintiff') {
-            return party.clientId && !isNaN(parseInt(party.clientId));
-          } else {
-            return party.opponentFirstName || party.opponentLastName;
-          }
+    // FIX 22: Wrap case + parties insert in transaction
+    const newCase = await db.transaction(async (tx) => {
+      const [inserted] = await tx.insert(cases)
+        .values({
+          caseNumber: caseNumber || null,
+          caseType: caseType || null,
+          judicialBodyId: parseOptionalInt(judicialBodyId),
+          chamberId: parseOptionalInt(chamberId),
+          wilayaId: parseOptionalInt(wilayaId),
+          registrationDate: parseOptionalDate(registrationDate),
+          firstSessionDate: parseOptionalDate(firstSessionDate),
+          subject: subject || null,
+          status: status || 'active',
+          fees: parseOptionalFloat(fees),
+          notes: notes || null,
+          judgmentNumber: judgmentNumber || null,
+          judgmentDate: parseOptionalDate(judgmentDate),
+          issuingCourt: issuingCourt || null,
+          originalCaseNumber: originalCaseNumber || null,
+          originalCourt: originalCourt || null,
         })
-        .map((party: any) => ({
-          caseId: newCase.id,
-          role: party.role || 'plaintiff',
-          clientId: party.role === 'plaintiff' && party.clientId ? parseInt(party.clientId) : null,
-          clientDescription: party.role === 'plaintiff' ? (party.clientDescription || null) : null,
-          opponentFirstName: party.role === 'defendant' ? (party.opponentFirstName || null) : null,
-          opponentLastName: party.role === 'defendant' ? (party.opponentLastName || null) : null,
-          opponentPhone: party.role === 'defendant' ? (party.opponentPhone || null) : null,
-          opponentAddress: party.role === 'defendant' ? (party.opponentAddress || null) : null,
-          description: party.role === 'defendant' ? (party.description || null) : null,
-          lawyerId: party.role === 'defendant' && party.lawyerId ? parseInt(party.lawyerId) : null,
-          lawyerDescription: party.role === 'defendant' ? (party.lawyerDescription || null) : null,
-        }));
+        .returning();
 
-      if (partyValues.length > 0) {
-        await db.insert(caseClients).values(partyValues);
+      // إضافة أطراف القضية
+      if (parties && Array.isArray(parties) && parties.length > 0) {
+        const partyValues = parties
+          .filter((party: any) => {
+            if (party.role === 'plaintiff') {
+              return party.clientId && !isNaN(parseInt(party.clientId));
+            } else {
+              return party.opponentFirstName || party.opponentLastName;
+            }
+          })
+          .map((party: any) => ({
+            caseId: inserted.id,
+            role: party.role || 'plaintiff',
+            clientId: party.role === 'plaintiff' && party.clientId ? parseInt(party.clientId) : null,
+            clientDescription: party.role === 'plaintiff' ? (party.clientDescription || null) : null,
+            opponentFirstName: party.role === 'defendant' ? (party.opponentFirstName || null) : null,
+            opponentLastName: party.role === 'defendant' ? (party.opponentLastName || null) : null,
+            opponentPhone: party.role === 'defendant' ? (party.opponentPhone || null) : null,
+            opponentAddress: party.role === 'defendant' ? (party.opponentAddress || null) : null,
+            description: party.role === 'defendant' ? (party.description || null) : null,
+            lawyerId: party.role === 'defendant' && party.lawyerId ? parseInt(party.lawyerId) : null,
+            lawyerDescription: party.role === 'defendant' ? (party.lawyerDescription || null) : null,
+          }));
+
+        if (partyValues.length > 0) {
+          await tx.insert(caseClients).values(partyValues);
+        }
       }
-    }
+
+      return inserted;
+    });
 
     return NextResponse.json(newCase);
   } catch (error) {
@@ -242,6 +267,13 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // FIX 19: Validate input with Zod
+    const parsed = caseUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'بيانات غير صالحة', details: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const {
       id,
       caseNumber,
@@ -279,7 +311,7 @@ export async function PUT(request: NextRequest) {
 
     // بناء كائن التحديث بالحقول المرسلة فقط
     const updateData: Record<string, any> = { updatedAt: new Date() };
-    
+
     if (caseNumber !== undefined) updateData.caseNumber = caseNumber || null;
     if (caseType !== undefined) updateData.caseType = caseType || null;
     if (judicialBodyId !== undefined) updateData.judicialBodyId = judicialBodyId ? parseInt(judicialBodyId) : null;
@@ -297,43 +329,48 @@ export async function PUT(request: NextRequest) {
     if (originalCaseNumber !== undefined) updateData.originalCaseNumber = originalCaseNumber || null;
     if (originalCourt !== undefined) updateData.originalCourt = originalCourt || null;
 
-    const [updatedCase] = await db.update(cases)
-      .set(updateData)
-      .where(eq(cases.id, id))
-      .returning();
+    // FIX 22: Wrap update + parties in transaction
+    const updatedCase = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(cases)
+        .set(updateData)
+        .where(eq(cases.id, id))
+        .returning();
 
-    // تحديث أطراف القضية
-    if (parties !== undefined) {
-      await db.delete(caseClients).where(eq(caseClients.caseId, id));
-      
-      if (Array.isArray(parties) && parties.length > 0) {
-        const partyValues = parties
-          .filter((party: any) => {
-            if (party.role === 'plaintiff') {
-              return party.clientId && !isNaN(parseInt(party.clientId));
-            } else {
-              return party.opponentFirstName || party.opponentLastName;
-            }
-          })
-          .map((party: any) => ({
-            caseId: id,
-            role: party.role || 'plaintiff',
-            clientId: party.role === 'plaintiff' && party.clientId ? parseInt(party.clientId) : null,
-            clientDescription: party.role === 'plaintiff' ? (party.clientDescription || null) : null,
-            opponentFirstName: party.role === 'defendant' ? (party.opponentFirstName || null) : null,
-            opponentLastName: party.role === 'defendant' ? (party.opponentLastName || null) : null,
-            opponentPhone: party.role === 'defendant' ? (party.opponentPhone || null) : null,
-            opponentAddress: party.role === 'defendant' ? (party.opponentAddress || null) : null,
-            description: party.role === 'defendant' ? (party.description || null) : null,
-            lawyerId: party.role === 'defendant' && party.lawyerId ? parseInt(party.lawyerId) : null,
-            lawyerDescription: party.role === 'defendant' ? (party.lawyerDescription || null) : null,
-          }));
+      // تحديث أطراف القضية
+      if (parties !== undefined) {
+        await tx.delete(caseClients).where(eq(caseClients.caseId, id));
 
-        if (partyValues.length > 0) {
-          await db.insert(caseClients).values(partyValues);
+        if (Array.isArray(parties) && parties.length > 0) {
+          const partyValues = parties
+            .filter((party: any) => {
+              if (party.role === 'plaintiff') {
+                return party.clientId && !isNaN(parseInt(party.clientId));
+              } else {
+                return party.opponentFirstName || party.opponentLastName;
+              }
+            })
+            .map((party: any) => ({
+              caseId: id,
+              role: party.role || 'plaintiff',
+              clientId: party.role === 'plaintiff' && party.clientId ? parseInt(party.clientId) : null,
+              clientDescription: party.role === 'plaintiff' ? (party.clientDescription || null) : null,
+              opponentFirstName: party.role === 'defendant' ? (party.opponentFirstName || null) : null,
+              opponentLastName: party.role === 'defendant' ? (party.opponentLastName || null) : null,
+              opponentPhone: party.role === 'defendant' ? (party.opponentPhone || null) : null,
+              opponentAddress: party.role === 'defendant' ? (party.opponentAddress || null) : null,
+              description: party.role === 'defendant' ? (party.description || null) : null,
+              lawyerId: party.role === 'defendant' && party.lawyerId ? parseInt(party.lawyerId) : null,
+              lawyerDescription: party.role === 'defendant' ? (party.lawyerDescription || null) : null,
+            }));
+
+          if (partyValues.length > 0) {
+            await tx.insert(caseClients).values(partyValues);
+          }
         }
       }
-    }
+
+      return updated;
+    });
 
     return NextResponse.json(updatedCase);
   } catch (error) {
@@ -359,8 +396,14 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
-    await db.delete(caseClients).where(eq(caseClients.caseId, parseInt(id)));
-    await db.delete(cases).where(eq(cases.id, parseInt(id)));
+    // FIX 23: Validate parseInt
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
+      return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+    }
+
+    await db.delete(caseClients).where(eq(caseClients.caseId, parsedId));
+    await db.delete(cases).where(eq(cases.id, parsedId));
 
     return NextResponse.json({ success: true });
   } catch (error) {

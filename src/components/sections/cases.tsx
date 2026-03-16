@@ -1,5 +1,16 @@
 'use client';
 
+// FIX 7: XSS prevention utility
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -1072,29 +1083,29 @@ export function CasesSection() {
           <div class="section-content">
             <div class="info-row">
               <span class="info-label">رقم القضية:</span>
-              <span class="info-value">${detailsCase.caseNumber || '-'}</span>
+              <span class="info-value">${escapeHtml(detailsCase.caseNumber) || '-'}</span>
             </div>
             <div class="info-row">
               <span class="info-label">نوع القضية:</span>
-              <span class="info-value">${CASE_TYPE_LABELS[detailsCase.caseType || ''] || '-'}</span>
+              <span class="info-value">${escapeHtml(CASE_TYPE_LABELS[detailsCase.caseType || '']) || '-'}</span>
             </div>
             <div class="info-row">
               <span class="info-label">الحالة:</span>
               <span class="info-value">
-                <span class="badge badge-${detailsCase.status}">${statusLabels[detailsCase.status] || '-'}</span>
+                <span class="badge badge-${escapeHtml(detailsCase.status)}">${escapeHtml(statusLabels[detailsCase.status]) || '-'}</span>
               </span>
             </div>
             <div class="info-row">
               <span class="info-label">الهيئة القضائية:</span>
-              <span class="info-value">${detailsCase.judicialBody || '-'}</span>
+              <span class="info-value">${escapeHtml(detailsCase.judicialBody) || '-'}</span>
             </div>
             <div class="info-row">
               <span class="info-label">الغرفة:</span>
-              <span class="info-value">${detailsCase.chamber || '-'}</span>
+              <span class="info-value">${escapeHtml(detailsCase.chamber) || '-'}</span>
             </div>
             <div class="info-row">
               <span class="info-label">الولاية:</span>
-              <span class="info-value">${detailsCase.wilaya || '-'}</span>
+              <span class="info-value">${escapeHtml(detailsCase.wilaya) || '-'}</span>
             </div>
             <div class="info-row">
               <span class="info-label">تاريخ التسجيل:</span>
@@ -1111,7 +1122,7 @@ export function CasesSection() {
             ${detailsCase.caseType === 'opposition' || detailsCase.caseType === 'appeal' ? `
             <div class="info-row">
               <span class="info-label">رقم الحكم الأصلي:</span>
-              <span class="info-value">${detailsCase.judgmentNumber || '-'}</span>
+              <span class="info-value">${escapeHtml(detailsCase.judgmentNumber) || '-'}</span>
             </div>
             <div class="info-row">
               <span class="info-label">تاريخ الحكم:</span>
@@ -1119,17 +1130,17 @@ export function CasesSection() {
             </div>
             <div class="info-row">
               <span class="info-label">المحكمة المصدرة:</span>
-              <span class="info-value">${detailsCase.issuingCourt || '-'}</span>
+              <span class="info-value">${escapeHtml(detailsCase.issuingCourt) || '-'}</span>
             </div>
             ` : ''}
             <div class="info-row">
               <span class="info-label">الموضوع:</span>
-              <span class="info-value">${detailsCase.subject || '-'}</span>
+              <span class="info-value">${escapeHtml(detailsCase.subject) || '-'}</span>
             </div>
             ${detailsCase.notes ? `
             <div class="info-row">
               <span class="info-label">ملاحظات:</span>
-              <span class="info-value">${detailsCase.notes}</span>
+              <span class="info-value">${escapeHtml(detailsCase.notes)}</span>
             </div>
             ` : ''}
           </div>
@@ -1144,10 +1155,10 @@ export function CasesSection() {
                 <div class="party-type">🟢 المدعين / الموكلين</div>
                 ${plaintiffs.map((p, i) => `
                   <div style="margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 5px;">
-                    <strong>${i + 1}. ${p.clientName || 'موكل غير محدد'}</strong>
-                    ${p.clientDescription ? `<br><span style="color: #666;">الوصف: ${p.clientDescription}</span>` : ''}
-                    ${p.lawyerName ? `<br><span style="color: #666;">المحامي: ${p.lawyerName}</span>` : ''}
-                    ${p.lawyerDescription ? `<br><span style="color: #666;">${p.lawyerDescription}</span>` : ''}
+                    <strong>${i + 1}. ${escapeHtml(p.clientName) || 'موكل غير محدد'}</strong>
+                    ${p.clientDescription ? `<br><span style="color: #666;">الوصف: ${escapeHtml(p.clientDescription)}</span>` : ''}
+                    ${p.lawyerName ? `<br><span style="color: #666;">المحامي: ${escapeHtml(p.lawyerName)}</span>` : ''}
+                    ${p.lawyerDescription ? `<br><span style="color: #666;">${escapeHtml(p.lawyerDescription)}</span>` : ''}
                   </div>
                 `).join('')}
               </div>
@@ -1158,10 +1169,10 @@ export function CasesSection() {
                 <div class="party-type">🔴 المدعى عليهم / الخصوم</div>
                 ${defendants.map((p, i) => `
                   <div style="margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 5px;">
-                    <strong>${i + 1}. ${p.opponentFirstName && p.opponentLastName ? `${p.opponentFirstName} ${p.opponentLastName}` : p.description || 'خصم غير محدد'}</strong>
-                    ${p.opponentPhone ? `<br><span style="color: #666;">الهاتف: ${p.opponentPhone}</span>` : ''}
-                    ${p.opponentAddress ? `<br><span style="color: #666;">العنوان: ${p.opponentAddress}</span>` : ''}
-                    ${p.lawyerName ? `<br><span style="color: #666;">المحامي: ${p.lawyerName}</span>` : ''}
+                    <strong>${i + 1}. ${p.opponentFirstName && p.opponentLastName ? `${escapeHtml(p.opponentFirstName)} ${escapeHtml(p.opponentLastName)}` : escapeHtml(p.description) || 'خصم غير محدد'}</strong>
+                    ${p.opponentPhone ? `<br><span style="color: #666;">الهاتف: ${escapeHtml(p.opponentPhone)}</span>` : ''}
+                    ${p.opponentAddress ? `<br><span style="color: #666;">العنوان: ${escapeHtml(p.opponentAddress)}</span>` : ''}
+                    ${p.lawyerName ? `<br><span style="color: #666;">المحامي: ${escapeHtml(p.lawyerName)}</span>` : ''}
                   </div>
                 `).join('')}
               </div>
@@ -1189,9 +1200,9 @@ export function CasesSection() {
                     <tr>
                       <td>${i + 1}</td>
                       <td>${formatDate(s.sessionDate)}</td>
-                      <td>${s.adjournmentReason || '-'}</td>
-                      <td>${s.decision || '-'}</td>
-                      <td>${s.notes || '-'}</td>
+                      <td>${escapeHtml(s.adjournmentReason) || '-'}</td>
+                      <td>${escapeHtml(s.decision) || '-'}</td>
+                      <td>${escapeHtml(s.notes) || '-'}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -1219,10 +1230,10 @@ export function CasesSection() {
                   ${expenses.map((e, i) => `
                     <tr>
                       <td>${i + 1}</td>
-                      <td>${e.description}</td>
+                      <td>${escapeHtml(e.description)}</td>
                       <td>${e.amount.toLocaleString('ar-DZ')} د.ج</td>
                       <td>${formatDate(e.expenseDate)}</td>
-                      <td>${e.notes || '-'}</td>
+                      <td>${escapeHtml(e.notes) || '-'}</td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -1248,7 +1259,7 @@ export function CasesSection() {
                   ${caseFiles.map((f, i) => `
                     <tr>
                       <td>${i + 1}</td>
-                      <td>${f.description || f.originalName}</td>
+                      <td>${escapeHtml(f.description || f.originalName)}</td>
                       <td>${formatFileSize(f.fileSize)}</td>
                     </tr>
                   `).join('')}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { lawyers, organizations } from '@/db/schema';
-import { eq, ilike, or, desc } from 'drizzle-orm';
+import { eq, or, desc, sql } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
@@ -56,10 +56,11 @@ export async function GET(request: NextRequest) {
       })
         .from(lawyers)
         .leftJoin(organizations, eq(lawyers.organizationId, organizations.id))
+        // FIX 9: Replace ilike with LOWER() LIKE for SQLite compatibility
         .where(or(
-          ilike(lawyers.firstName, `%${search}%`),
-          ilike(lawyers.lastName, `%${search}%`),
-          ilike(lawyers.phone, `%${search}%`)
+          sql`LOWER(${lawyers.firstName}) LIKE ${`%${search.toLowerCase()}%`}`,
+          sql`LOWER(${lawyers.lastName}) LIKE ${`%${search.toLowerCase()}%`}`,
+          sql`LOWER(${lawyers.phone}) LIKE ${`%${search.toLowerCase()}%`}`
         ))
         .orderBy(desc(lawyers.createdAt));
     } else {

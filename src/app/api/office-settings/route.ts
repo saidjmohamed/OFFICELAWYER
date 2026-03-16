@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { officeSettings, wilayas } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { cookies } from 'next/headers';
 
 // GET - جلب إعدادات المكتب
 export async function GET() {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     // جلب الإعدادات (يجب أن يكون هناك صف واحد فقط)
     let settings = await db.select().from(officeSettings);
     
@@ -35,6 +42,12 @@ export async function GET() {
 // PUT - تحديث إعدادات المكتب
 export async function PUT(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const body = await request.json();
     
     // جلب الإعدادات الحالية

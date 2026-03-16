@@ -6,7 +6,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  reactStrictMode: false,
+  // FIX 30: Enable React strict mode
+  reactStrictMode: true,
 };
 
 export default nextConfig;

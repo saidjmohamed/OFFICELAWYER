@@ -4,6 +4,7 @@ import { caseFiles } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { cookies } from 'next/headers';
 
 // مسار تخزين الملفات
 const UPLOAD_DIR = join(process.cwd(), 'uploads', 'case-files');
@@ -18,6 +19,12 @@ function ensureUploadDir() {
 // الحصول على ملفات قضية
 export async function GET(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const caseId = request.nextUrl.searchParams.get('caseId');
     const fileId = request.nextUrl.searchParams.get('id');
     const download = request.nextUrl.searchParams.get('download');
@@ -63,11 +70,32 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// FIX 21: Allowed file types and max size
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 // رفع ملف جديد
 export async function POST(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     ensureUploadDir();
-    
+
     const formData = await request.formData();
     const caseId = formData.get('caseId');
     const file = formData.get('file') as File;
@@ -75,6 +103,14 @@ export async function POST(request: NextRequest) {
 
     if (!caseId || !file) {
       return NextResponse.json({ error: 'معرف القضية والملف مطلوبان' }, { status: 400 });
+    }
+
+    // FIX 21: Validate file type and size
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'نوع الملف غير مسموح' }, { status: 400 });
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: 'حجم الملف يتجاوز الحد المسموح (10 ميجابايت)' }, { status: 400 });
     }
 
     // إنشاء اسم فريد للملف
@@ -110,6 +146,12 @@ export async function POST(request: NextRequest) {
 // حذف ملف
 export async function DELETE(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const id = request.nextUrl.searchParams.get('id');
     
     if (!id) {

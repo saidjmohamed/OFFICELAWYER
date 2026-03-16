@@ -60,33 +60,20 @@ export async function GET() {
       .where(sql`session_date >= ${todayEnd} AND session_date < ${tomorrowEnd}`);
     const tomorrowSessionsCount = tomorrowSessionsResult[0]?.count || 0;
 
-    // آخر الجلسات القادمة
-    const upcomingSessions = await db.select()
+    // FIX 15: Replace N+1 with a single JOIN query
+    const upcomingSessionsWithCases = await db.select({
+      id: sessions.id,
+      session_date: sessions.sessionDate,
+      case_number: cases.caseNumber,
+      subject: cases.subject,
+    })
       .from(sessions)
-      .where(sql`session_date >= ${now.getTime()}`)
+      .leftJoin(cases, eq(sessions.caseId, cases.id))
+      .where(sql`${sessions.sessionDate} >= ${now.getTime()}`)
       .orderBy(sessions.sessionDate)
       .limit(5);
 
-    // جلب معلومات القضايا للجلسات
-    const sessionsWithCases = await Promise.all(
-      upcomingSessions.map(async (session) => {
-        if (session.caseId) {
-          const caseData = await db.select().from(cases).where(eq(cases.id, session.caseId));
-          return {
-            id: session.id,
-            session_date: session.sessionDate,
-            case_number: caseData[0]?.caseNumber || null,
-            subject: caseData[0]?.subject || null,
-          };
-        }
-        return {
-          id: session.id,
-          session_date: session.sessionDate,
-          case_number: null,
-          subject: null,
-        };
-      })
-    );
+    const sessionsWithCases = upcomingSessionsWithCases;
 
     // آخر القضايا (غير المؤرشفة)
     const recentCases = await db.select()
@@ -106,21 +93,46 @@ export async function GET() {
       // الجدول قد لا يكون موجوداً بعد
     }
 
-    // بيانات الجلسات الشهرية
-    const monthlySessions = [
-      { month: 'جانفي', count: 0 },
-      { month: 'فيفري', count: 0 },
-      { month: 'مارس', count: 0 },
-      { month: 'أفريل', count: 0 },
-      { month: 'ماي', count: 0 },
-      { month: 'جوان', count: totalSessions },
-    ];
+    // FIX 16: Dynamic monthly sessions from DB for current year
+    const monthNames = ['جانفي', 'فيفري', 'مارس', 'أفريل', 'ماي', 'جوان', 'جويلية', 'أوت', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    const currentYear = now.getFullYear();
+    const yearStart = new Date(currentYear, 0, 1).getTime();
+    const yearEnd = new Date(currentYear + 1, 0, 1).getTime();
+
+    const monthlySessionsRaw = await db.select({
+      month: sql<number>`CAST(strftime('%m', datetime(${sessions.sessionDate} / 1000, 'unixepoch')) AS INTEGER)`,
+      count: sql<number>`count(*)`,
+    })
+      .from(sessions)
+      .where(sql`${sessions.sessionDate} >= ${yearStart} AND ${sessions.sessionDate} < ${yearEnd}`)
+      .groupBy(sql`strftime('%m', datetime(${sessions.sessionDate} / 1000, 'unixepoch'))`);
+
+    const monthlyCountMap: Record<number, number> = {};
+    for (const row of monthlySessionsRaw) {
+      monthlyCountMap[row.month] = row.count;
+    }
+
+    const monthlySessions = monthNames.map((name, i) => ({
+      month: name,
+      count: monthlyCountMap[i + 1] || 0,
+    }));
+
+    // FIX 17: Calculate actual weekly sessions count
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday start
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const weekSessionsResult = await db.select({ count: sql<number>`count(*)` })
+      .from(sessions)
+      .where(sql`${sessions.sessionDate} >= ${weekStart.getTime()} AND ${sessions.sessionDate} < ${weekEnd.getTime()}`);
+    const weekSessionsCount = weekSessionsResult[0]?.count || 0;
 
     return NextResponse.json({
       activeCases,
       todaySessions: todaySessionsCount,
       tomorrowSessions: tomorrowSessionsCount,
-      weekSessions: totalSessions,
+      weekSessions: weekSessionsCount,
       totalFees,
       totalClients,
       totalJudicialBodies,

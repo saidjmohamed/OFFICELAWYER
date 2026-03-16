@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { activities } from '@/db/schema';
 import { desc, eq } from 'drizzle-orm';
-import { cookies } from 'next/server';
+// FIX 18: cookies must be imported from next/headers, not next/server
+import { cookies } from 'next/headers';
 
 // GET - جلب آخر النشاطات
 export async function GET(request: NextRequest) {

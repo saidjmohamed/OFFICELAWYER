@@ -66,16 +66,18 @@ export const judicialBodyTypes = [
   { value: 'court', label: 'محكمة' },
   { value: 'supreme_court', label: 'المحكمة العليا' },
   { value: 'state_council', label: 'مجلس الدولة' },
-  { value: 'administrative_court', label: 'محكمة إدارية' },
+  // FIX 14: Renamed to match schema enum value
+  { value: 'admin_court', label: 'محكمة إدارية' },
   { value: 'admin_appeal_court', label: 'محكمة إدارية استئنافية' },
   { value: 'commercial_court', label: 'محكمة تجارية متخصصة' },
 ];
 
 // الأنواع المستقلة (لا تحتاج مجلس أم)
+// FIX 14: Renamed administrative_court to admin_court to match schema
 export const independentBodyTypes = [
   'supreme_court',
   'state_council',
-  'administrative_court',
+  'admin_court',
   'admin_appeal_court',
   'commercial_court',
 ];
@@ -92,9 +94,11 @@ export const caseTypes = [
 ];
 
 // حالات القضايا
+// FIX 14: Add 'archived' status to match schema enum
 export const caseStatuses = [
   { value: 'active', label: 'نشطة' },
   { value: 'adjourned', label: 'مؤجلة' },
   { value: 'judged', label: 'محكوم فيها' },
   { value: 'closed', label: 'مغلقة' },
+  { value: 'archived', label: 'مؤرشفة' },
 ];

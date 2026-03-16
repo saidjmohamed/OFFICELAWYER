@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { organizations, wilayas } from '@/db/schema';
-import { eq, ilike, or, desc } from 'drizzle-orm';
+import { eq, or, desc, sql, and } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
 // أنواع المنظمات
@@ -55,14 +55,17 @@ export async function GET(request: NextRequest) {
       conditions.push(eq(organizations.type, type));
     }
 
+    // FIX 9: Replace ilike with LOWER() LIKE for SQLite compatibility
     if (search) {
+      const searchLower = search.toLowerCase();
       conditions.push(or(
-        ilike(organizations.name, `%${search}%`),
-        ilike(organizations.address, `%${search}%`)
+        sql`LOWER(${organizations.name}) LIKE ${`%${searchLower}%`}`,
+        sql`LOWER(${organizations.address}) LIKE ${`%${searchLower}%`}`
       )!);
     }
 
-    const result = await db.select({
+    // FIX 10: Actually apply filter conditions to the query
+    const query = db.select({
       id: organizations.id,
       name: organizations.name,
       type: organizations.type,
@@ -73,8 +76,11 @@ export async function GET(request: NextRequest) {
       wilaya: wilayas.name,
     })
       .from(organizations)
-      .leftJoin(wilayas, eq(organizations.wilayaId, wilayas.id))
-      .orderBy(desc(organizations.createdAt));
+      .leftJoin(wilayas, eq(organizations.wilayaId, wilayas.id));
+
+    const result = conditions.length > 0
+      ? await query.where(and(...conditions)).orderBy(desc(organizations.createdAt))
+      : await query.orderBy(desc(organizations.createdAt));
 
     // إضافة التسمية العربية للنوع
     const resultWithType = result.map(org => ({

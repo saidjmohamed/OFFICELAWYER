@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { caseExpenses } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { cookies } from 'next/headers';
+// FIX 19: Zod validation
+import { caseExpenseSchema, caseExpenseUpdateSchema } from '@/lib/validations';
 
 // الحصول على مصاريف قضية
 export async function GET(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const caseId = request.nextUrl.searchParams.get('caseId');
     const id = request.nextUrl.searchParams.get('id');
 
@@ -35,7 +44,20 @@ export async function GET(request: NextRequest) {
 // إضافة مصروف جديد
 export async function POST(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const body = await request.json();
+
+    // FIX 19: Validate input with Zod
+    const parsed = caseExpenseSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'بيانات غير صالحة', details: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const { caseId, description, amount, expenseDate, notes } = body;
 
     if (!caseId || !description || !amount) {
@@ -62,7 +84,20 @@ export async function POST(request: NextRequest) {
 // تحديث مصروف
 export async function PUT(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const body = await request.json();
+
+    // FIX 19: Validate input with Zod
+    const parsed = caseExpenseUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'بيانات غير صالحة', details: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const { id, description, amount, expenseDate, notes } = body;
 
     if (!id) {
@@ -90,6 +125,12 @@ export async function PUT(request: NextRequest) {
 // حذف مصروف
 export async function DELETE(request: NextRequest) {
   try {
+    // FIX 5: Auth check
+    const cookieStore = await cookies();
+    if (cookieStore.get('authenticated')?.value !== 'true') {
+      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
+    }
+
     const id = request.nextUrl.searchParams.get('id');
     
     if (!id) {

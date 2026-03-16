@@ -106,9 +106,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
             )}
           </Button>
 
-          <p className="text-xs text-muted-foreground text-center">
-            الرمز الافتراضي: 123456
-          </p>
+          {/* FIX 8: Removed default passcode hint */}
         </form>
       </CardContent>
     </Card>

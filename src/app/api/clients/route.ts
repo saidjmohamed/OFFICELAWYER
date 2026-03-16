@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { clients } from '@/db/schema';
-import { eq, like, or, ilike, sql, desc } from 'drizzle-orm';
+import { eq, or, sql, desc } from 'drizzle-orm';
 import { cookies } from 'next/headers';
+// FIX 19: Zod validation
+import { clientSchema, clientUpdateSchema } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,8 +53,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data: clientList, total, page, limit });
   } catch (error) {
     console.error('خطأ في جلب الموكلين:', error);
-    const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
-    return NextResponse.json({ error: 'حدث خطأ', details: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ' }, { status: 500 });
   }
 }
 
@@ -66,6 +67,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // FIX 19: Validate input with Zod
+    const parsed = clientSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'بيانات غير صالحة', details: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const { fullName, phone, address, notes, clientType, businessName, legalRepresentative } = body;
 
     const [newClient] = await db.insert(clients)
@@ -97,6 +105,13 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // FIX 19: Validate input with Zod
+    const parsed = clientUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'بيانات غير صالحة', details: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
     const { id, fullName, phone, address, notes, clientType, businessName, legalRepresentative } = body;
 
     if (!id) {
