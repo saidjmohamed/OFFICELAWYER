@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Tajawal } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -48,24 +49,20 @@ export default function RootLayout({
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function(registration) {
-                      console.log('SW registered: ', registration);
-                    },
-                    function(registrationError) {
-                      console.log('SW registration failed: ', registrationError);
-                    }
-                  );
-                });
-              }
-            `,
-          }}
-        />
+        <Script id="sw-register" strategy="afterInteractive">
+          {`if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js').then(
+                function(registration) {
+                  console.log('SW registered: ', registration);
+                },
+                function(registrationError) {
+                  console.log('SW registration failed: ', registrationError);
+                }
+              );
+            });
+          }`}
+        </Script>
       </head>
       <body
         className={`${tajawal.variable} ${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}

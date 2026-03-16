@@ -2,29 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { cases, caseClients, clients, sessions, caseFiles, caseExpenses, judicialBodies, chambers, wilayas, lawyers, organizations } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const caseId = searchParams.get('caseId');
     const format = searchParams.get('format') || 'json';
 
-    if (!caseId) {
-      return NextResponse.json({ error: 'معرف القضية مطلوب' }, { status: 400 });
+    const parsedCaseId = safeParseInt(caseId);
+    if (!parsedCaseId) {
+      return NextResponse.json({ error: 'معرف القضية مطلوب أو غير صالح' }, { status: 400 });
     }
 
     // جلب بيانات القضية
     const caseResult = await db.select()
       .from(cases)
-      .where(eq(cases.id, parseInt(caseId)));
+      .where(eq(cases.id, parsedCaseId));
 
     if (caseResult.length === 0) {
       return NextResponse.json({ error: 'القضية غير موجودة' }, { status: 404 });
@@ -57,12 +55,12 @@ export async function GET(request: NextRequest) {
       .leftJoin(clients, eq(caseClients.clientId, clients.id))
       .leftJoin(lawyers, eq(caseClients.lawyerId, lawyers.id))
       .leftJoin(organizations, eq(lawyers.organizationId, organizations.id))
-      .where(eq(caseClients.caseId, parseInt(caseId)));
+      .where(eq(caseClients.caseId, parsedCaseId));
 
     // جلب الجلسات
     const caseSessions = await db.select()
       .from(sessions)
-      .where(eq(sessions.caseId, parseInt(caseId)));
+      .where(eq(sessions.caseId, parsedCaseId));
 
     // جلب الملفات (معلمومات فقط بدون المحتوى)
     const files = await db.select({
@@ -76,12 +74,12 @@ export async function GET(request: NextRequest) {
       createdAt: caseFiles.createdAt,
     })
       .from(caseFiles)
-      .where(eq(caseFiles.caseId, parseInt(caseId)));
+      .where(eq(caseFiles.caseId, parsedCaseId));
 
     // جلب المصروفات
     const expenses = await db.select()
       .from(caseExpenses)
-      .where(eq(caseExpenses.caseId, parseInt(caseId)));
+      .where(eq(caseExpenses.caseId, parsedCaseId));
 
     // جلب معلومات الهيئة القضائية
     let judicialBody = null;

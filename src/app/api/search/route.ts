@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
 import { sql } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 // ==================== أنواع ====================
 
@@ -249,16 +250,12 @@ async function searchJudicialBodies(query: string, limit: number): Promise<Searc
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = Math.min(safeParseInt(searchParams.get('limit')) || 20, 100);
 
     if (!query || query.trim().length < 1) {
       return NextResponse.json({ 

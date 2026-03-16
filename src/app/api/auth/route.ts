@@ -108,9 +108,8 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('خطأ في المصادقة:', error);
-    const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
     return NextResponse.json(
-      { success: false, error: 'حدث خطأ في المصادقة', details: errorMessage },
+      { success: false, error: 'حدث خطأ في المصادقة' },
       { status: HTTP_STATUS.INTERNAL_SERVER_ERROR }
     );
   }

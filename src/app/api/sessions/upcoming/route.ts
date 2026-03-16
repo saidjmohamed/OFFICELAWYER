@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { sessions, cases, judicialBodies } from '@/db/schema';
 import { eq, gte, lte, asc, and } from 'drizzle-orm';
+import { safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const days = parseInt(searchParams.get('days') || '7');
+    const days = safeParseInt(searchParams.get('days')) || 7;
     
     const now = new Date();
     const endDate = new Date();

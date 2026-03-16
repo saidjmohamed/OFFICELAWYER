@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { officeSettings, wilayas } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { requireAuth } from '@/lib/helpers';
 
 // GET - جلب إعدادات المكتب
 export async function GET() {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
     // جلب الإعدادات (يجب أن يكون هناك صف واحد فقط)
     let settings = await db.select().from(officeSettings);
     
@@ -35,6 +38,8 @@ export async function GET() {
 // PUT - تحديث إعدادات المكتب
 export async function PUT(request: NextRequest) {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
     const body = await request.json();
     
     // جلب الإعدادات الحالية

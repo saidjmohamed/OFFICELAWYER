@@ -4,6 +4,7 @@ import { cases, caseClients, clients, judicialBodies, chambers, wilayas, lawyers
 import { eq, or, sql, desc, and, inArray } from 'drizzle-orm';
 import { requireAuth } from '@/lib/helpers';
 import { z } from 'zod';
+import { safeParseInt } from '@/lib/validations';
 
 // مخطط التحقق لإنشاء/تحديث قضية
 const caseSchema = z.object({
@@ -35,15 +36,17 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
+    const page = safeParseInt(searchParams.get('page')) || 1;
+    const limit = Math.min(safeParseInt(searchParams.get('limit')) || 20, 100);
     const offset = (page - 1) * limit;
 
     if (id) {
+      const parsedId = safeParseInt(id);
+      if (!parsedId) return NextResponse.json({ error: 'معرف القضية غير صالح' }, { status: 400 });
       // جلب تفاصيل قضية واحدة
       const caseResult = await db.select()
         .from(cases)
-        .where(eq(cases.id, parseInt(id)));
+        .where(eq(cases.id, parsedId));
 
       if (caseResult.length === 0) {
         return NextResponse.json(null);
@@ -74,7 +77,7 @@ export async function GET(request: NextRequest) {
         .leftJoin(clients, eq(caseClients.clientId, clients.id))
         .leftJoin(lawyers, eq(caseClients.lawyerId, lawyers.id))
         .leftJoin(organizations, eq(lawyers.organizationId, organizations.id))
-        .where(eq(caseClients.caseId, parseInt(id)));
+        .where(eq(caseClients.caseId, parsedId));
 
       return NextResponse.json({
         ...caseItem,
@@ -359,37 +362,39 @@ export async function PUT(request: NextRequest) {
       .where(eq(cases.id, id))
       .returning();
 
-    // تحديث أطراف القضية
+    // تحديث أطراف القضية داخل معاملة واحدة
     if (parties !== undefined) {
-      await db.delete(caseClients).where(eq(caseClients.caseId, id));
+      await db.transaction(async (tx) => {
+        await tx.delete(caseClients).where(eq(caseClients.caseId, id));
 
-      if (Array.isArray(parties) && parties.length > 0) {
-        const partyValues = parties
-          .filter((party: any) => {
-            if (party.role === 'plaintiff') {
-              return party.clientId && !isNaN(parseInt(party.clientId));
-            } else {
-              return party.opponentFirstName || party.opponentLastName;
-            }
-          })
-          .map((party: any) => ({
-            caseId: id,
-            role: party.role || 'plaintiff',
-            clientId: party.role === 'plaintiff' && party.clientId ? parseInt(party.clientId) : null,
-            clientDescription: party.role === 'plaintiff' ? (party.clientDescription || null) : null,
-            opponentFirstName: party.role === 'defendant' ? (party.opponentFirstName || null) : null,
-            opponentLastName: party.role === 'defendant' ? (party.opponentLastName || null) : null,
-            opponentPhone: party.role === 'defendant' ? (party.opponentPhone || null) : null,
-            opponentAddress: party.role === 'defendant' ? (party.opponentAddress || null) : null,
-            description: party.role === 'defendant' ? (party.description || null) : null,
-            lawyerId: party.role === 'defendant' && party.lawyerId ? parseInt(party.lawyerId) : null,
-            lawyerDescription: party.role === 'defendant' ? (party.lawyerDescription || null) : null,
-          }));
+        if (Array.isArray(parties) && parties.length > 0) {
+          const partyValues = parties
+            .filter((party: any) => {
+              if (party.role === 'plaintiff') {
+                return party.clientId && !isNaN(parseInt(party.clientId));
+              } else {
+                return party.opponentFirstName || party.opponentLastName;
+              }
+            })
+            .map((party: any) => ({
+              caseId: id,
+              role: party.role || 'plaintiff',
+              clientId: party.role === 'plaintiff' && party.clientId ? parseInt(party.clientId) : null,
+              clientDescription: party.role === 'plaintiff' ? (party.clientDescription || null) : null,
+              opponentFirstName: party.role === 'defendant' ? (party.opponentFirstName || null) : null,
+              opponentLastName: party.role === 'defendant' ? (party.opponentLastName || null) : null,
+              opponentPhone: party.role === 'defendant' ? (party.opponentPhone || null) : null,
+              opponentAddress: party.role === 'defendant' ? (party.opponentAddress || null) : null,
+              description: party.role === 'defendant' ? (party.description || null) : null,
+              lawyerId: party.role === 'defendant' && party.lawyerId ? parseInt(party.lawyerId) : null,
+              lawyerDescription: party.role === 'defendant' ? (party.lawyerDescription || null) : null,
+            }));
 
-        if (partyValues.length > 0) {
-          await db.insert(caseClients).values(partyValues);
+          if (partyValues.length > 0) {
+            await tx.insert(caseClients).values(partyValues);
+          }
         }
-      }
+      });
     }
 
     return NextResponse.json(updatedCase);
@@ -412,8 +417,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
-    await db.delete(caseClients).where(eq(caseClients.caseId, parseInt(id)));
-    await db.delete(cases).where(eq(cases.id, parseInt(id)));
+    const parsedId = safeParseInt(id);
+    if (!parsedId) return NextResponse.json({ error: 'معرف القضية غير صالح' }, { status: 400 });
+    await db.delete(caseClients).where(eq(caseClients.caseId, parsedId));
+    await db.delete(cases).where(eq(cases.id, parsedId));
 
     return NextResponse.json({ success: true });
   } catch (error) {

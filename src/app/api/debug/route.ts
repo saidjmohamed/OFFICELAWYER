@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { clients, cases, sessions, judicialBodies, wilayas, settings } from '@/db/schema';
+import { clients, cases, sessions, judicialBodies } from '@/db/schema';
 import { sql } from 'drizzle-orm';
+import { requireAuth } from '@/lib/helpers';
 
 // هذه الصفحة تعمل في وضع التطوير والمعاينة فقط
 export async function GET() {
+  // التحقق من المصادقة
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+
   // التحقق من البيئة - السماح في development و preview
   if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Debug page disabled in production.',
-      enabled: false 
+      enabled: false
     }, { status: 403 });
   }
 
@@ -35,42 +40,19 @@ export async function GET() {
       tableCounts[table.name] = result[0]?.count || 0;
     }
 
-    // جلب آخر 10 سجلات من الجداول الرئيسية
-    const recentClients = await db.select().from(clients).limit(10);
-    const recentCases = await db.select().from(cases).limit(10);
-    const recentSessions = await db.select().from(sessions).limit(10);
-    const recentBodies = await db.select().from(judicialBodies).limit(10);
-
-    // إخفاء المتغيرات الحساسة
-    const envStatus = {
-      NODE_ENV: process.env.NODE_ENV,
-      DATABASE_PATH: process.env.DATABASE_PATH || 'default',
-      // إخفاء القيم الحساسة
-      TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN ? '********' : 'not set',
-      DATABASE_URL: process.env.DATABASE_URL ? '********' : 'not set',
-    };
-
     return NextResponse.json({
       enabled: true,
       timestamp: new Date().toISOString(),
       connection: {
         status: connectionTest ? 'connected' : 'failed',
-        testQuery: 'SELECT 1',
       },
       tables: tableCounts,
-      data: {
-        clients: recentClients,
-        cases: recentCases,
-        sessions: recentSessions,
-        judicialBodies: recentBodies,
-      },
-      environment: envStatus,
     });
   } catch (error) {
+    console.error('خطأ في صفحة التصحيح:', error);
     return NextResponse.json({
       enabled: true,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
+      error: 'حدث خطأ في التصحيح',
     }, { status: 500 });
   }
 }

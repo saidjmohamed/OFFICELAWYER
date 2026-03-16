@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { users, roles, rolePermissions, permissions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { hashPassword, verifyPassword, getAuthenticatedUser } from '@/services/auth.service';
+import { safeParseInt } from '@/lib/validations';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/constants';
 
 /**
@@ -371,7 +372,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const id = parseInt(searchParams.get('id') || '0');
+    const id = safeParseInt(searchParams.get('id'));
 
     if (!id) {
       return NextResponse.json(

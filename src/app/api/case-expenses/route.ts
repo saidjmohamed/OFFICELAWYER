@@ -2,15 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { caseExpenses } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { requireAuth } from '@/lib/helpers';
+import { caseExpenseSchema, caseExpenseUpdateSchema, safeParseInt } from '@/lib/validations';
 
 // الحصول على مصاريف قضية
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
     const caseId = request.nextUrl.searchParams.get('caseId');
     const id = request.nextUrl.searchParams.get('id');
 
     if (id) {
-      const expense = await db.select().from(caseExpenses).where(eq(caseExpenses.id, parseInt(id))).limit(1);
+      const parsedId = safeParseInt(id);
+      if (!parsedId) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+      const expense = await db.select().from(caseExpenses).where(eq(caseExpenses.id, parsedId)).limit(1);
       return NextResponse.json(expense[0] || null);
     }
 
@@ -18,8 +24,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'معرف القضية مطلوب' }, { status: 400 });
     }
 
+    const parsedCaseId = safeParseInt(caseId);
+    if (!parsedCaseId) return NextResponse.json({ error: 'معرف القضية غير صالح' }, { status: 400 });
+
     const expenses = await db.select().from(caseExpenses)
-      .where(eq(caseExpenses.caseId, parseInt(caseId)))
+      .where(eq(caseExpenses.caseId, parsedCaseId))
       .orderBy(desc(caseExpenses.expenseDate));
     
     // حساب المجموع
@@ -35,17 +44,21 @@ export async function GET(request: NextRequest) {
 // إضافة مصروف جديد
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
     const body = await request.json();
-    const { caseId, description, amount, expenseDate, notes } = body;
+    const validation = caseExpenseSchema.safeParse(body);
 
-    if (!caseId || !description || !amount) {
-      return NextResponse.json({ error: 'القضية والوصف والمبلغ مطلوبون' }, { status: 400 });
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.errors[0]?.message || 'بيانات غير صالحة' }, { status: 400 });
     }
 
+    const { caseId, description, amount, expenseDate, notes } = validation.data;
+
     const result = await db.insert(caseExpenses).values({
-      caseId: parseInt(caseId),
+      caseId,
       description,
-      amount: parseFloat(amount),
+      amount,
       expenseDate: expenseDate ? new Date(expenseDate) : null,
       notes: notes || null,
     }).returning();
@@ -60,21 +73,25 @@ export async function POST(request: NextRequest) {
 // تحديث مصروف
 export async function PUT(request: NextRequest) {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
     const body = await request.json();
-    const { id, description, amount, expenseDate, notes } = body;
+    const validation = caseExpenseUpdateSchema.safeParse(body);
 
-    if (!id) {
-      return NextResponse.json({ error: 'معرف المصروف مطلوب' }, { status: 400 });
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.errors[0]?.message || 'بيانات غير صالحة' }, { status: 400 });
     }
+
+    const { id, description, amount, expenseDate, notes } = validation.data;
 
     const result = await db.update(caseExpenses)
       .set({
-        description,
-        amount: parseFloat(amount),
+        ...(description !== undefined && { description }),
+        ...(amount !== undefined && { amount }),
         expenseDate: expenseDate ? new Date(expenseDate) : null,
         notes: notes || null,
       })
-      .where(eq(caseExpenses.id, parseInt(id)))
+      .where(eq(caseExpenses.id, id))
       .returning();
 
     return NextResponse.json(result[0]);
@@ -87,13 +104,18 @@ export async function PUT(request: NextRequest) {
 // حذف مصروف
 export async function DELETE(request: NextRequest) {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
     const id = request.nextUrl.searchParams.get('id');
     
     if (!id) {
       return NextResponse.json({ error: 'معرف المصروف مطلوب' }, { status: 400 });
     }
 
-    await db.delete(caseExpenses).where(eq(caseExpenses.id, parseInt(id)));
+    const parsedId = safeParseInt(id);
+    if (!parsedId) return NextResponse.json({ error: 'معرف المصروف غير صالح' }, { status: 400 });
+
+    await db.delete(caseExpenses).where(eq(caseExpenses.id, parsedId));
 
     return NextResponse.json({ message: 'تم حذف المصروف بنجاح' });
   } catch (error) {

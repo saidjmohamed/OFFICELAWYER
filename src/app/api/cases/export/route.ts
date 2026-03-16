@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { cases, clients, caseClients, sessions, caseFiles, caseExpenses, judicialBodies, chambers, wilayas, lawyers, organizations, officeSettings } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
+
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return '-';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 // أسماء أنواع القضايا
 const CASE_TYPE_LABELS: Record<string, string> = {
@@ -25,25 +36,22 @@ const STATUS_LABELS: Record<string, string> = {
 export async function GET(request: NextRequest) {
   try {
     // التحقق من المصادقة
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const caseId = searchParams.get('id');
     const preview = searchParams.get('preview') === 'true';
 
-    if (!caseId) {
-      return NextResponse.json({ error: 'معرف القضية مطلوب' }, { status: 400 });
+    const parsedCaseId = safeParseInt(caseId);
+    if (!parsedCaseId) {
+      return NextResponse.json({ error: 'معرف القضية مطلوب أو غير صالح' }, { status: 400 });
     }
 
     // جلب بيانات القضية الأساسية
     const caseData = await db.select()
       .from(cases)
-      .where(eq(cases.id, parseInt(caseId)))
+      .where(eq(cases.id, parsedCaseId))
       .limit(1);
 
     if (!caseData.length) {
@@ -105,7 +113,7 @@ export async function GET(request: NextRequest) {
       .leftJoin(clients, eq(caseClients.clientId, clients.id))
       .leftJoin(lawyers, eq(caseClients.lawyerId, lawyers.id))
       .leftJoin(organizations, eq(lawyers.organizationId, organizations.id))
-      .where(eq(caseClients.caseId, parseInt(caseId)));
+      .where(eq(caseClients.caseId, parsedCaseId));
 
     // جلب الجلسات
     const sessionsList = await db.select({
@@ -133,7 +141,7 @@ export async function GET(request: NextRequest) {
       notes: caseExpenses.notes,
     })
       .from(caseExpenses)
-      .where(eq(caseExpenses.caseId, parseInt(caseId)));
+      .where(eq(caseExpenses.caseId, parsedCaseId));
 
     // حساب مجموع المصروفات
     const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -173,7 +181,7 @@ export async function GET(request: NextRequest) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>بطاقة القضية - ${caseItem.caseNumber || 'بدون رقم'}</title>
+  <title>بطاقة القضية - ${escapeHtml(caseItem.caseNumber) || 'بدون رقم'}</title>
   <style>
     * {
       margin: 0;
@@ -362,7 +370,7 @@ export async function GET(request: NextRequest) {
   <div class="container">
     <!-- الترويسة -->
     <div class="header">
-      <h1>${office.officeName || 'مكتب المحامي'}</h1>
+      <h1>${escapeHtml(office.officeName) || 'مكتب المحامي'}</h1>
       <div class="subtitle">بطاقة القضية</div>
     </div>
 
@@ -372,43 +380,43 @@ export async function GET(request: NextRequest) {
       
       <div class="info-row">
         <span class="info-label">رقم القضية:</span>
-        <span class="info-value">${caseItem.caseNumber || 'بدون رقم'}</span>
+        <span class="info-value">${escapeHtml(caseItem.caseNumber) || 'بدون رقم'}</span>
       </div>
       
       <div class="info-row">
         <span class="info-label">نوع القضية:</span>
-        <span class="info-value">${CASE_TYPE_LABELS[caseItem.caseType || ''] || caseItem.caseType || '-'}</span>
+        <span class="info-value">${escapeHtml(CASE_TYPE_LABELS[caseItem.caseType || ''] || caseItem.caseType)}</span>
       </div>
       
       <div class="info-row">
         <span class="info-label">الحالة:</span>
         <span class="info-value">
           <span class="status-badge status-${caseItem.status || 'active'}">
-            ${STATUS_LABELS[caseItem.status || 'active'] || caseItem.status}
+            ${escapeHtml(STATUS_LABELS[caseItem.status || 'active'] || caseItem.status)}
           </span>
         </span>
       </div>
       
       <div class="info-row">
         <span class="info-label">الموضوع:</span>
-        <span class="info-value">${caseItem.subject || '-'}</span>
+        <span class="info-value">${escapeHtml(caseItem.subject)}</span>
       </div>
       
       <div class="info-row">
         <span class="info-label">الهيئة القضائية:</span>
-        <span class="info-value">${judicialBody?.name || '-'}</span>
+        <span class="info-value">${escapeHtml(judicialBody?.name)}</span>
       </div>
       
       ${chamber ? `
       <div class="info-row">
         <span class="info-label">الغرفة/القسم:</span>
-        <span class="info-value">${chamber.name}</span>
+        <span class="info-value">${escapeHtml(chamber.name)}</span>
       </div>
       ` : ''}
       
       <div class="info-row">
         <span class="info-label">الولاية:</span>
-        <span class="info-value">${wilaya?.name || '-'}</span>
+        <span class="info-value">${escapeHtml(wilaya?.name)}</span>
       </div>
       
       <div class="info-row">
@@ -431,20 +439,20 @@ export async function GET(request: NextRequest) {
       <!-- المدعين -->
       ${plaintiffs.map(p => `
       <div class="party-box">
-        <div class="party-name">👤 المدعي: ${p.clientName || 'غير محدد'}</div>
-        ${p.clientDescription ? `<div class="party-detail">الصفة: ${p.clientDescription}</div>` : ''}
+        <div class="party-name">👤 المدعي: ${escapeHtml(p.clientName) || 'غير محدد'}</div>
+        ${p.clientDescription ? `<div class="party-detail">الصفة: ${escapeHtml(p.clientDescription)}</div>` : ''}
       </div>
       `).join('')}
       
       <!-- المدعى عليهم -->
       ${defendants.map(p => {
-        const name = p.clientName || [p.opponentFirstName, p.opponentLastName].filter(Boolean).join(' ') || 'غير محدد';
+        const name = escapeHtml(p.clientName || [p.opponentFirstName, p.opponentLastName].filter(Boolean).join(' ')) || 'غير محدد';
         return `
         <div class="party-box defendant">
           <div class="party-name">👤 المدعى عليه: ${name}</div>
-          ${p.description ? `<div class="party-detail">الصفة: ${p.description}</div>` : ''}
+          ${p.description ? `<div class="party-detail">الصفة: ${escapeHtml(p.description)}</div>` : ''}
           ${p.lawyerFirstName && p.lawyerLastName ? `
-            <div class="party-detail">المحامي: ${p.lawyerFirstName} ${p.lawyerLastName}${p.lawyerOrganization ? ` (${p.lawyerOrganization})` : ''}</div>
+            <div class="party-detail">المحامي: ${escapeHtml(p.lawyerFirstName)} ${escapeHtml(p.lawyerLastName)}${p.lawyerOrganization ? ` (${escapeHtml(p.lawyerOrganization)})` : ''}</div>
           ` : ''}
         </div>
         `;
@@ -485,7 +493,7 @@ export async function GET(request: NextRequest) {
       ${sessionsList.slice(0, 5).map(s => `
       <div class="session-row">
         <div class="session-date">${formatDate(s.sessionDate)}</div>
-        <div class="session-info">${s.decision || s.adjournmentReason || s.notes || '-'}</div>
+        <div class="session-info">${escapeHtml(s.decision || s.adjournmentReason || s.notes)}</div>
       </div>
       `).join('')}
       
@@ -501,13 +509,13 @@ export async function GET(request: NextRequest) {
     ${caseItem.notes ? `
     <div class="section">
       <div class="section-title">ملاحظات</div>
-      <div style="color: #475569; line-height: 1.8;">${caseItem.notes}</div>
+      <div style="color: #475569; line-height: 1.8;">${escapeHtml(caseItem.notes)}</div>
     </div>
     ` : ''}
 
     <!-- التذييل -->
     <div class="footer">
-      <span>صادرة من ${office.officeName || 'مكتب المحامي'} - ${office.lawyerName || 'المحامي'}</span>
+      <span>صادرة من ${escapeHtml(office.officeName) || 'مكتب المحامي'} - ${escapeHtml(office.lawyerName) || 'المحامي'}</span>
       <span>تم التصدير في: ${new Date().toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
     </div>
   </div>

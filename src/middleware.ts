@@ -14,6 +14,8 @@ import type { NextRequest } from 'next/server';
 const publicPaths = [
   '/api/auth',
   '/api/health',
+  '/api/init-db',
+  '/api/update-check',
 ];
 
 // المسارات الثابتة

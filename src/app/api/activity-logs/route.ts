@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { activityLogs } from '@/db/schema';
 import { desc, eq, and, gte, lte, sql } from 'drizzle-orm';
+import { safeParseInt } from '@/lib/validations';
 
 // جلب سجل النشاطات
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const limit = Math.min(safeParseInt(searchParams.get('limit')) || 50, 500);
+    const offset = safeParseInt(searchParams.get('offset')) || 0;
     const entityType = searchParams.get('entityType');
     const entityId = searchParams.get('entityId');
     const action = searchParams.get('action');
@@ -23,7 +24,8 @@ export async function GET(request: NextRequest) {
     }
     
     if (entityId) {
-      conditions.push(eq(activityLogs.entityId, parseInt(entityId)));
+      const parsedEntityId = safeParseInt(entityId);
+      if (parsedEntityId) conditions.push(eq(activityLogs.entityId, parsedEntityId));
     }
     
     if (action) {
@@ -112,7 +114,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const olderThanDays = parseInt(searchParams.get('olderThanDays') || '90');
+    const olderThanDays = safeParseInt(searchParams.get('olderThanDays')) || 90;
     
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);

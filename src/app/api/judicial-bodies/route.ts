@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { judicialBodies, chambers, wilayas, cases, sessions } from '@/db/schema';
 import { eq, and, isNull, inArray as drizzleInArray, SQL, or } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 // أنواع التنظيمات القضائية
 const JUDICIAL_ORGANIZATIONS: Record<string, string[]> = {
@@ -15,12 +16,8 @@ const JUDICIAL_ORGANIZATIONS: Record<string, string[]> = {
 // جلب الهيئات القضائية
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const wilayaId = searchParams.get('wilayaId');
@@ -32,7 +29,9 @@ export async function GET(request: NextRequest) {
     const conditions: SQL[] = [];
     
     if (wilayaId) {
-      conditions.push(eq(judicialBodies.wilayaId, parseInt(wilayaId)));
+      const parsedWilayaId = safeParseInt(wilayaId);
+      if (!parsedWilayaId) return NextResponse.json({ error: 'معرف الولاية غير صالح' }, { status: 400 });
+      conditions.push(eq(judicialBodies.wilayaId, parsedWilayaId));
     }
     if (type) {
       conditions.push(eq(judicialBodies.type, type));
@@ -41,7 +40,9 @@ export async function GET(request: NextRequest) {
       if (parentId === 'null') {
         conditions.push(isNull(judicialBodies.parentId));
       } else {
-        conditions.push(eq(judicialBodies.parentId, parseInt(parentId)));
+        const parsedParentId = safeParseInt(parentId);
+        if (!parsedParentId) return NextResponse.json({ error: 'معرف الهيئة الأم غير صالح' }, { status: 400 });
+        conditions.push(eq(judicialBodies.parentId, parsedParentId));
       }
     }
     if (organization && JUDICIAL_ORGANIZATIONS[organization]) {
@@ -198,12 +199,8 @@ const CHAMBER_NAMES: Record<string, string> = {
 // إضافة هيئة قضائية جديدة
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     const { name, type, wilayaId, parentId, chambers: chambersData } = body;
@@ -225,8 +222,8 @@ export async function POST(request: NextRequest) {
 
     // المحكمة العليا ليس لها ولاية
     // البحث عن معرف الولاية باستخدام رقمها
-    if (type !== 'supreme_court' && wilayaId && !isNaN(parseInt(wilayaId))) {
-      const wilayaNumber = parseInt(wilayaId);
+    if (type !== 'supreme_court' && wilayaId && safeParseInt(wilayaId) !== null) {
+      const wilayaNumber = safeParseInt(wilayaId)!;
       const wilayaRecord = await db.select().from(wilayas).where(eq(wilayas.number, wilayaNumber)).limit(1);
       if (wilayaRecord.length > 0) {
         insertData.wilayaId = wilayaRecord[0].id;
@@ -235,8 +232,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (parentId && !isNaN(parseInt(parentId))) {
-      insertData.parentId = parseInt(parentId);
+    if (parentId && safeParseInt(parentId) !== null) {
+      insertData.parentId = safeParseInt(parentId)!;
     }
 
     console.log('بيانات الإدراج:', insertData);
@@ -277,12 +274,8 @@ export async function POST(request: NextRequest) {
 // تحديث هيئة قضائية
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     const { id, name, type, wilayaId, parentId } = body;
@@ -299,7 +292,7 @@ export async function PUT(request: NextRequest) {
     // تحويل رقم الولاية إلى معرف الولاية
     if (wilayaId !== undefined) {
       if (wilayaId) {
-        const wilayaNumber = parseInt(wilayaId);
+        const wilayaNumber = safeParseInt(wilayaId)!;
         const wilayaRecord = await db.select().from(wilayas).where(eq(wilayas.number, wilayaNumber)).limit(1);
         if (wilayaRecord.length > 0) {
           updateData.wilayaId = wilayaRecord[0].id;
@@ -309,7 +302,7 @@ export async function PUT(request: NextRequest) {
       }
     }
     
-    if (parentId !== undefined) updateData.parentId = parentId ? parseInt(parentId) : null;
+    if (parentId !== undefined) updateData.parentId = safeParseInt(parentId);
 
     const updated = await db.update(judicialBodies)
       .set(updateData)
@@ -329,12 +322,8 @@ export async function PUT(request: NextRequest) {
 // حذف هيئة قضائية
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
@@ -346,7 +335,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
-    const bodyId = parseInt(id);
+    const bodyId = safeParseInt(id);
+    if (!bodyId) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
 
     // جلب معلومات الهيئة
     const bodyInfo = await db.select()

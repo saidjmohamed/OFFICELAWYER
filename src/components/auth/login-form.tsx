@@ -450,7 +450,6 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
       <CardFooter className="flex flex-col gap-2 pt-0">
         <p className="text-xs text-muted-foreground text-center">
           {activeTab === 'user' && !registerMode && 'اسم المستخدم الافتراضي: admin / admin123'}
-          {activeTab === 'passcode' && 'الرمز الافتراضي: 123456'}
         </p>
       </CardFooter>
     </Card>

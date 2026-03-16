@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { organizations, wilayas } from '@/db/schema';
-import { eq, ilike, or, desc } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { eq, and, or, desc, sql } from 'drizzle-orm';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 // أنواع المنظمات
 const ORGANIZATION_TYPES = [
@@ -14,12 +15,8 @@ const ORGANIZATION_TYPES = [
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
@@ -27,6 +24,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search');
 
     if (id) {
+      const parsed = parseInt(id);
+      if (isNaN(parsed)) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
       const org = await db.select({
         id: organizations.id,
         name: organizations.name,
@@ -39,7 +38,7 @@ export async function GET(request: NextRequest) {
       })
         .from(organizations)
         .leftJoin(wilayas, eq(organizations.wilayaId, wilayas.id))
-        .where(eq(organizations.id, parseInt(id)));
+        .where(eq(organizations.id, parsed));
 
       if (org.length === 0) {
         return NextResponse.json(null);
@@ -49,18 +48,21 @@ export async function GET(request: NextRequest) {
     }
 
     // بناء الاستعلام
-    let conditions = [];
-    
+    const conditions = [];
+
     if (type) {
       conditions.push(eq(organizations.type, type));
     }
 
     if (search) {
+      const searchLower = search.toLowerCase();
       conditions.push(or(
-        ilike(organizations.name, `%${search}%`),
-        ilike(organizations.address, `%${search}%`)
+        sql`LOWER(${organizations.name}) LIKE ${`%${searchLower}%`}`,
+        sql`LOWER(${organizations.address}) LIKE ${`%${searchLower}%`}`
       )!);
     }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     const result = await db.select({
       id: organizations.id,
@@ -74,6 +76,7 @@ export async function GET(request: NextRequest) {
     })
       .from(organizations)
       .leftJoin(wilayas, eq(organizations.wilayaId, wilayas.id))
+      .where(whereClause)
       .orderBy(desc(organizations.createdAt));
 
     // إضافة التسمية العربية للنوع
@@ -91,12 +94,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     const {
@@ -114,7 +113,7 @@ export async function POST(request: NextRequest) {
         type: type || null,
         address: address || null,
         phone: phone || null,
-        wilayaId: wilayaId ? parseInt(wilayaId) : null,
+        wilayaId: safeParseInt(wilayaId),
         notes: notes || null,
       })
       .returning();
@@ -122,19 +121,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(newOrg);
   } catch (error) {
     console.error('خطأ في إنشاء منظمة:', error);
-    const errorMessage = error instanceof Error ? error.message : 'حدث خطأ';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في إنشاء المنظمة' }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     const {
@@ -157,7 +151,7 @@ export async function PUT(request: NextRequest) {
         type: type || null,
         address: address || null,
         phone: phone || null,
-        wilayaId: wilayaId ? parseInt(wilayaId) : null,
+        wilayaId: safeParseInt(wilayaId),
         notes: notes || null,
         updatedAt: new Date(),
       })
@@ -173,12 +167,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
@@ -187,7 +177,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
-    await db.delete(organizations).where(eq(organizations.id, parseInt(id)));
+    const parsed = parseInt(id);
+    if (isNaN(parsed)) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+
+    await db.delete(organizations).where(eq(organizations.id, parsed));
 
     return NextResponse.json({ success: true });
   } catch (error) {

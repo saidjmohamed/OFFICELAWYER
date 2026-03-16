@@ -19,15 +19,10 @@ export async function GET() {
     });
   } catch (error) {
     console.error('خطأ في تهيئة قاعدة البيانات:', error);
-    const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'فشل في تهيئة قاعدة البيانات',
-        details: errorMessage,
-        stack: errorStack
       },
       { status: 500 }
     );

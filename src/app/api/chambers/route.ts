@@ -2,26 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { chambers, SUPREME_COURT_CHAMBERS, JUDICIAL_COUNCIL_CHAMBERS, COURT_SECTIONS } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 // GET - جلب الغرف
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const judicialBodyId = searchParams.get('judicialBodyId');
 
     let chamberList;
     if (judicialBodyId) {
+      const parsedBodyId = safeParseInt(judicialBodyId);
+      if (!parsedBodyId) return NextResponse.json({ error: 'معرف الهيئة القضائية غير صالح' }, { status: 400 });
       chamberList = await db.select()
         .from(chambers)
-        .where(eq(chambers.judicialBodyId, parseInt(judicialBodyId)));
+        .where(eq(chambers.judicialBodyId, parsedBodyId));
     } else {
       chamberList = await db.select().from(chambers);
     }
@@ -36,12 +35,8 @@ export async function GET(request: NextRequest) {
 // POST - إنشاء غرف متعددة أو غرفة واحدة
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
 
@@ -114,12 +109,8 @@ export async function POST(request: NextRequest) {
 // DELETE - حذف غرفة
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
@@ -128,7 +119,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
-    await db.delete(chambers).where(eq(chambers.id, parseInt(id)));
+    const parsedId = safeParseInt(id);
+    if (!parsedId) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+    await db.delete(chambers).where(eq(chambers.id, parsedId));
 
     return NextResponse.json({ success: true });
   } catch (error) {

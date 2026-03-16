@@ -191,7 +191,7 @@ export const judicialBodyTypes = [
   { value: 'court', label: 'محكمة' },
   { value: 'supreme_court', label: 'المحكمة العليا' },
   { value: 'state_council', label: 'مجلس الدولة' },
-  { value: 'administrative_court', label: 'محكمة إدارية' },
+  { value: 'admin_court', label: 'محكمة إدارية' },
   { value: 'admin_appeal_court', label: 'محكمة إدارية استئنافية' },
   { value: 'commercial_court', label: 'محكمة تجارية متخصصة' },
 ];
@@ -200,7 +200,7 @@ export const judicialBodyTypes = [
 export const independentBodyTypes = [
   'supreme_court',
   'state_council',
-  'administrative_court',
+  'admin_court',
   'admin_appeal_court',
   'commercial_court',
 ];
@@ -222,4 +222,5 @@ export const caseStatuses = [
   { value: 'adjourned', label: 'مؤجلة' },
   { value: 'judged', label: 'محكوم فيها' },
   { value: 'closed', label: 'مغلقة' },
+  { value: 'archived', label: 'مؤرشفة' },
 ];

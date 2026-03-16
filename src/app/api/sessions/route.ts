@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { sessions, cases } from '@/db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { requireAuth } from '@/lib/helpers';
+import { sessionSchema, sessionUpdateSchema, safeParseInt } from '@/lib/validations';
 
 // الحصول على جلسات قضية أو جميع الجلسات
 export async function GET(request: NextRequest) {
@@ -12,17 +13,21 @@ export async function GET(request: NextRequest) {
 
     const caseId = request.nextUrl.searchParams.get('caseId');
     const id = request.nextUrl.searchParams.get('id');
-    const page = parseInt(request.nextUrl.searchParams.get('page') || '1');
-    const limit = Math.min(parseInt(request.nextUrl.searchParams.get('limit') || '20'), 100);
+    const page = safeParseInt(request.nextUrl.searchParams.get('page')) || 1;
+    const limit = Math.min(safeParseInt(request.nextUrl.searchParams.get('limit')) || 20, 100);
     const offset = (page - 1) * limit;
 
     if (id) {
-      const session = await db.select().from(sessions).where(eq(sessions.id, parseInt(id))).limit(1);
+      const parsedId = safeParseInt(id);
+      if (!parsedId) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+      const session = await db.select().from(sessions).where(eq(sessions.id, parsedId)).limit(1);
       return NextResponse.json(session[0] || null);
     }
 
     // بناء شرط التصفية
-    const whereClause = caseId ? eq(sessions.caseId, parseInt(caseId)) : undefined;
+    const parsedCaseId = caseId ? safeParseInt(caseId) : null;
+    if (caseId && !parsedCaseId) return NextResponse.json({ error: 'معرف القضية غير صالح' }, { status: 400 });
+    const whereClause = parsedCaseId ? eq(sessions.caseId, parsedCaseId) : undefined;
 
     // جلب العدد الإجمالي
     const countResult = await db.select({ count: sql<number>`count(*)` })
@@ -77,14 +82,16 @@ export async function POST(request: NextRequest) {
     if (auth instanceof NextResponse) return auth;
 
     const body = await request.json();
-    const { caseId, sessionDate, adjournmentReason, decision, rulingText, notes } = body;
+    const validation = sessionSchema.safeParse(body);
 
-    if (!caseId) {
-      return NextResponse.json({ error: 'معرف القضية مطلوب' }, { status: 400 });
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.errors[0]?.message || 'بيانات غير صالحة' }, { status: 400 });
     }
 
+    const { caseId, sessionDate, adjournmentReason, decision, rulingText, notes } = validation.data;
+
     const result = await db.insert(sessions).values({
-      caseId: parseInt(caseId),
+      caseId,
       sessionDate: sessionDate ? new Date(sessionDate) : null,
       adjournmentReason,
       decision,
@@ -108,11 +115,13 @@ export async function PUT(request: NextRequest) {
     if (auth instanceof NextResponse) return auth;
 
     const body = await request.json();
-    const { id, sessionDate, adjournmentReason, decision, rulingText, notes } = body;
+    const validation = sessionUpdateSchema.safeParse(body);
 
-    if (!id) {
-      return NextResponse.json({ error: 'معرف الجلسة مطلوب' }, { status: 400 });
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error.errors[0]?.message || 'بيانات غير صالحة' }, { status: 400 });
     }
+
+    const { id, sessionDate, adjournmentReason, decision, rulingText, notes } = validation.data;
 
     const result = await db.update(sessions)
       .set({
@@ -123,7 +132,7 @@ export async function PUT(request: NextRequest) {
         notes,
         updatedAt: new Date(),
       })
-      .where(eq(sessions.id, parseInt(id)))
+      .where(eq(sessions.id, id))
       .returning();
 
     return NextResponse.json(result[0]);
@@ -140,12 +149,13 @@ export async function DELETE(request: NextRequest) {
     if (auth instanceof NextResponse) return auth;
 
     const id = request.nextUrl.searchParams.get('id');
+    const parsedId = safeParseInt(id);
 
-    if (!id) {
-      return NextResponse.json({ error: 'معرف الجلسة مطلوب' }, { status: 400 });
+    if (!parsedId) {
+      return NextResponse.json({ error: 'معرف الجلسة مطلوب أو غير صالح' }, { status: 400 });
     }
 
-    await db.delete(sessions).where(eq(sessions.id, parseInt(id)));
+    await db.delete(sessions).where(eq(sessions.id, parsedId));
 
     return NextResponse.json({ message: 'تم حذف الجلسة بنجاح' });
   } catch (error) {

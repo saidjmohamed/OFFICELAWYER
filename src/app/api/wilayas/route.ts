@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { wilayas } from '@/db/schema';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const wilayaList = await db.select().from(wilayas);
     return NextResponse.json(wilayaList);

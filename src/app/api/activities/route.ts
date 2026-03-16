@@ -2,20 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { activities } from '@/db/schema';
 import { desc, eq } from 'drizzle-orm';
-import { cookies } from 'next/server';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 // GET - جلب آخر النشاطات
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = Math.min(safeParseInt(searchParams.get('limit')) || 20, 100);
     const entityType = searchParams.get('entity_type');
     const entityId = searchParams.get('entity_id');
 
@@ -24,7 +21,7 @@ export async function GET(request: NextRequest) {
     if (entityType && entityId) {
       query = query.where(
         eq(activities.entityType, entityType),
-        eq(activities.entityId, parseInt(entityId))
+        eq(activities.entityId, safeParseInt(entityId) || 0)
       ) as any;
     }
 
@@ -40,12 +37,8 @@ export async function GET(request: NextRequest) {
 // POST - إضافة نشاط جديد
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     

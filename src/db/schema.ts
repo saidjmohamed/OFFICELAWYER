@@ -103,6 +103,8 @@ export const organizations = sqliteTable('organizations', {
   name: text('name'),
   type: text('type', { enum: [
     'bar_association',      // نقابة محامين
+    'judicial_council',     // مجلس قضائي
+    'court',                // محكمة
     'other'                 // أخرى
   ] }),
   address: text('address'),

@@ -2,16 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { calendarEvents, sessions, cases } from '@/db/schema';
 import { eq, and, sql, isNotNull } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get('startDate');
@@ -133,12 +130,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     const {
@@ -174,12 +167,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
@@ -188,7 +177,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
-    await db.delete(calendarEvents).where(eq(calendarEvents.id, parseInt(id)));
+    const parsedId = safeParseInt(id);
+    if (!parsedId) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+    await db.delete(calendarEvents).where(eq(calendarEvents.id, parsedId));
 
     return NextResponse.json({ success: true });
   } catch (error) {

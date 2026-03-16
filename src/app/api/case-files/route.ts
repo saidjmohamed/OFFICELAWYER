@@ -4,9 +4,33 @@ import { caseFiles } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 // مسار تخزين الملفات
 const UPLOAD_DIR = join(process.cwd(), 'uploads', 'case-files');
+
+// الحد الأقصى لحجم الملف (10 ميجابايت)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+// أنواع الملفات المسموحة
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+];
+
+const ALLOWED_EXTENSIONS = [
+  'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp',
+  'doc', 'docx', 'xls', 'xlsx', 'txt',
+];
 
 // التأكد من وجود مجلد التحميل
 function ensureUploadDir() {
@@ -18,12 +42,16 @@ function ensureUploadDir() {
 // الحصول على ملفات قضية
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
     const caseId = request.nextUrl.searchParams.get('caseId');
     const fileId = request.nextUrl.searchParams.get('id');
     const download = request.nextUrl.searchParams.get('download');
 
     if (fileId) {
-      const file = await db.select().from(caseFiles).where(eq(caseFiles.id, parseInt(fileId))).limit(1);
+      const parsedFileId = safeParseInt(fileId);
+      if (!parsedFileId) return NextResponse.json({ error: 'معرف الملف غير صالح' }, { status: 400 });
+      const file = await db.select().from(caseFiles).where(eq(caseFiles.id, parsedFileId)).limit(1);
       
       if (file.length === 0) {
         return NextResponse.json({ error: 'الملف غير موجود' }, { status: 404 });
@@ -55,7 +83,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'معرف القضية مطلوب' }, { status: 400 });
     }
 
-    const files = await db.select().from(caseFiles).where(eq(caseFiles.caseId, parseInt(caseId)));
+    const parsedCaseId = safeParseInt(caseId);
+    if (!parsedCaseId) return NextResponse.json({ error: 'معرف القضية غير صالح' }, { status: 400 });
+    const files = await db.select().from(caseFiles).where(eq(caseFiles.caseId, parsedCaseId));
     return NextResponse.json(files);
   } catch (error) {
     console.error('خطأ في جلب الملفات:', error);
@@ -66,6 +96,9 @@ export async function GET(request: NextRequest) {
 // رفع ملف جديد
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
+
     ensureUploadDir();
     
     const formData = await request.formData();
@@ -78,10 +111,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'معرف القضية والملف مطلوبان' }, { status: 400 });
     }
 
+    // التحقق من حجم الملف
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: 'حجم الملف يتجاوز الحد المسموح (10 ميجابايت)' }, { status: 400 });
+    }
+
+    // التحقق من نوع الملف
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return NextResponse.json({ error: `نوع الملف غير مسموح. الأنواع المسموحة: ${ALLOWED_EXTENSIONS.join(', ')}` }, { status: 400 });
+    }
+
+    if (file.type && !ALLOWED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'نوع الملف غير مسموح' }, { status: 400 });
+    }
+
     // إنشاء اسم فريد للملف
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const ext = file.name.split('.').pop() || 'bin';
     const fileName = `${timestamp}-${randomSuffix}.${ext}`;
 
     // حفظ الملف
@@ -92,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     // حفظ معلومات الملف في قاعدة البيانات
     const result = await db.insert(caseFiles).values({
-      caseId: parseInt(caseId as string),
+      caseId: safeParseInt(caseId as string) || 0,
       fileName,
       originalName: file.name,
       filePath,
@@ -112,6 +159,8 @@ export async function POST(request: NextRequest) {
 // حذف ملف
 export async function DELETE(request: NextRequest) {
   try {
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
     const id = request.nextUrl.searchParams.get('id');
     
     if (!id) {
@@ -119,8 +168,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     // الحصول على معلومات الملف قبل الحذف
-    const file = await db.select().from(caseFiles).where(eq(caseFiles.id, parseInt(id))).limit(1);
-    
+    const parsedId = safeParseInt(id);
+    if (!parsedId) return NextResponse.json({ error: 'معرف الملف غير صالح' }, { status: 400 });
+
+    const file = await db.select().from(caseFiles).where(eq(caseFiles.id, parsedId)).limit(1);
+
     if (file.length === 0) {
       return NextResponse.json({ error: 'الملف غير موجود' }, { status: 404 });
     }
@@ -134,7 +186,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // حذف السجل من قاعدة البيانات
-    await db.delete(caseFiles).where(eq(caseFiles.id, parseInt(id)));
+    await db.delete(caseFiles).where(eq(caseFiles.id, parsedId));
 
     return NextResponse.json({ message: 'تم حذف الملف بنجاح' });
   } catch (error) {

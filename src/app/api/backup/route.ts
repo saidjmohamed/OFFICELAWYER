@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sqlite, db } from '@/db';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
 import { readFile, writeFile, copyFile, unlink, mkdir, readdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
@@ -66,12 +66,8 @@ async function getRecordCounts(): Promise<BackupMetadata['recordCounts']> {
 // تصدير النسخة الاحتياطية (ZIP)
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const action = searchParams.get('action');
@@ -156,12 +152,8 @@ async function checkDatabaseIntegrity(dbPath: string): Promise<string> {
 // معاينة أو استيراد النسخة الاحتياطية
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     const { data, confirmed, action } = body;

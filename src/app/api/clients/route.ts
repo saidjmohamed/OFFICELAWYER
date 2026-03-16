@@ -4,6 +4,7 @@ import { clients } from '@/db/schema';
 import { eq, or, sql, desc } from 'drizzle-orm';
 import { requireAuth } from '@/lib/helpers';
 import { z } from 'zod';
+import { safeParseInt } from '@/lib/validations';
 
 // مخطط التحقق لإنشاء/تحديث موكل
 const clientSchema = z.object({
@@ -24,12 +25,14 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     const search = searchParams.get('search');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
+    const page = safeParseInt(searchParams.get('page')) || 1;
+    const limit = Math.min(safeParseInt(searchParams.get('limit')) || 20, 100);
     const offset = (page - 1) * limit;
 
     if (id) {
-      const client = await db.select().from(clients).where(eq(clients.id, parseInt(id)));
+      const parsedId = safeParseInt(id);
+      if (!parsedId) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+      const client = await db.select().from(clients).where(eq(clients.id, parsedId));
       return NextResponse.json(client[0] || null);
     }
 
@@ -156,7 +159,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
-    await db.delete(clients).where(eq(clients.id, parseInt(id)));
+    const parsedId = safeParseInt(id);
+    if (!parsedId) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+    await db.delete(clients).where(eq(clients.id, parsedId));
 
     return NextResponse.json({ success: true });
   } catch (error) {

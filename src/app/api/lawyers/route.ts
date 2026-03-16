@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { lawyers, organizations } from '@/db/schema';
-import { eq, ilike, or, desc } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { eq, or, desc, sql } from 'drizzle-orm';
+import { requireAuth } from '@/lib/helpers';
+import { safeParseInt } from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     const search = searchParams.get('search');
 
     if (id) {
+      const parsed = parseInt(id);
+      if (isNaN(parsed)) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
       const lawyer = await db.select({
         id: lawyers.id,
         firstName: lawyers.firstName,
@@ -31,7 +30,7 @@ export async function GET(request: NextRequest) {
       })
         .from(lawyers)
         .leftJoin(organizations, eq(lawyers.organizationId, organizations.id))
-        .where(eq(lawyers.id, parseInt(id)));
+        .where(eq(lawyers.id, parsed));
 
       if (lawyer.length === 0) {
         return NextResponse.json(null);
@@ -43,6 +42,7 @@ export async function GET(request: NextRequest) {
     // جلب قائمة المحامين
     let result;
     if (search) {
+      const searchLower = search.toLowerCase();
       result = await db.select({
         id: lawyers.id,
         firstName: lawyers.firstName,
@@ -57,9 +57,9 @@ export async function GET(request: NextRequest) {
         .from(lawyers)
         .leftJoin(organizations, eq(lawyers.organizationId, organizations.id))
         .where(or(
-          ilike(lawyers.firstName, `%${search}%`),
-          ilike(lawyers.lastName, `%${search}%`),
-          ilike(lawyers.phone, `%${search}%`)
+          sql`LOWER(${lawyers.firstName}) LIKE ${`%${searchLower}%`}`,
+          sql`LOWER(${lawyers.lastName}) LIKE ${`%${searchLower}%`}`,
+          sql`LOWER(${lawyers.phone}) LIKE ${`%${searchLower}%`}`
         ))
         .orderBy(desc(lawyers.createdAt));
     } else {
@@ -88,12 +88,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     const {
@@ -111,7 +107,7 @@ export async function POST(request: NextRequest) {
         lastName: lastName || null,
         phone: phone || null,
         professionalAddress: professionalAddress || null,
-        organizationId: organizationId ? parseInt(organizationId) : null,
+        organizationId: safeParseInt(organizationId),
         notes: notes || null,
       })
       .returning();
@@ -119,19 +115,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(newLawyer);
   } catch (error) {
     console.error('خطأ في إنشاء محامي:', error);
-    const errorMessage = error instanceof Error ? error.message : 'حدث خطأ';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'حدث خطأ في إنشاء المحامي' }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const body = await request.json();
     const {
@@ -154,7 +145,7 @@ export async function PUT(request: NextRequest) {
         lastName: lastName || null,
         phone: phone || null,
         professionalAddress: professionalAddress || null,
-        organizationId: organizationId ? parseInt(organizationId) : null,
+        organizationId: safeParseInt(organizationId),
         notes: notes || null,
         updatedAt: new Date(),
       })
@@ -170,12 +161,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
@@ -184,7 +171,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'المعرف مطلوب' }, { status: 400 });
     }
 
-    await db.delete(lawyers).where(eq(lawyers.id, parseInt(id)));
+    const parsed = parseInt(id);
+    if (isNaN(parsed)) return NextResponse.json({ error: 'معرف غير صالح' }, { status: 400 });
+
+    await db.delete(lawyers).where(eq(lawyers.id, parsed));
 
     return NextResponse.json({ success: true });
   } catch (error) {

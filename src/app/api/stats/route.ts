@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { cases, sessions, clients, judicialBodies, caseExpenses, activityLogs } from '@/db/schema';
 import { eq, sql, desc, and, gte, lte } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/helpers';
 
 // الأشهر بالعربية
 const arabicMonths = [
@@ -56,12 +56,8 @@ const caseTypeColors: Record<string, string> = {
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const authenticated = cookieStore.get('authenticated');
-
-    if (authenticated?.value !== 'true') {
-      return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const now = new Date();
 
@@ -136,8 +132,15 @@ export async function GET() {
     // ==================== الجلسات القادمة (خلال 7 أيام) ====================
     const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).getTime();
     
-    const upcomingSessionsRaw = await db.select()
+    const upcomingSessions = await db.select({
+      id: sessions.id,
+      sessionDate: sessions.sessionDate,
+      caseNumber: cases.caseNumber,
+      subject: cases.subject,
+      caseType: cases.caseType,
+    })
       .from(sessions)
+      .leftJoin(cases, eq(sessions.caseId, cases.id))
       .where(and(
         gte(sessions.sessionDate, now.getTime()),
         lte(sessions.sessionDate, sevenDaysLater)
@@ -145,58 +148,39 @@ export async function GET() {
       .orderBy(sessions.sessionDate)
       .limit(10);
 
-    // جلب معلومات القضايا للجلسات
-    const upcomingSessions = await Promise.all(
-      upcomingSessionsRaw.map(async (session) => {
-        if (session.caseId) {
-          const caseData = await db.select().from(cases).where(eq(cases.id, session.caseId));
-          return {
-            id: session.id,
-            sessionDate: session.sessionDate,
-            caseNumber: caseData[0]?.caseNumber || null,
-            subject: caseData[0]?.subject || null,
-            caseType: caseData[0]?.caseType || null,
-          };
-        }
-        return {
-          id: session.id,
-          sessionDate: session.sessionDate,
-          caseNumber: null,
-          subject: null,
-          caseType: null,
-        };
-      })
-    );
-
     // ==================== الإحصائيات الشهرية (آخر 6 أشهر) ====================
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+
+    // جلب عدد القضايا والجلسات لكل شهر بـ استعلامين فقط
+    const [monthlyCasesRaw, monthlySessionsRaw] = await Promise.all([
+      db.select({
+        month: sql<string>`strftime('%Y-%m', datetime(${cases.createdAt} / 1000, 'unixepoch'))`,
+        count: sql<number>`count(*)`,
+      }).from(cases)
+        .where(and(gte(cases.createdAt, sixMonthsAgo), lte(cases.createdAt, currentMonthEnd)))
+        .groupBy(sql`strftime('%Y-%m', datetime(${cases.createdAt} / 1000, 'unixepoch'))`),
+      db.select({
+        month: sql<string>`strftime('%Y-%m', datetime(${sessions.sessionDate} / 1000, 'unixepoch'))`,
+        count: sql<number>`count(*)`,
+      }).from(sessions)
+        .where(and(gte(sessions.sessionDate, sixMonthsAgo), lte(sessions.sessionDate, currentMonthEnd)))
+        .groupBy(sql`strftime('%Y-%m', datetime(${sessions.sessionDate} / 1000, 'unixepoch'))`),
+    ]);
+
+    const casesCountMap = new Map(monthlyCasesRaw.map(r => [r.month, r.count]));
+    const sessionsCountMap = new Map(monthlySessionsRaw.map(r => [r.month, r.count]));
+
     const monthlyStats = [];
     for (let i = 5; i >= 0; i--) {
       const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthStart = monthDate.getTime();
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59).getTime();
-      
-      // عدد القضايا الجديدة في الشهر
-      const monthCasesResult = await db.select({ count: sql<number>`count(*)` })
-        .from(cases)
-        .where(and(
-          gte(cases.createdAt, monthStart),
-          lte(cases.createdAt, monthEnd)
-        ));
-      
-      // عدد الجلسات في الشهر
-      const monthSessionsResult = await db.select({ count: sql<number>`count(*)` })
-        .from(sessions)
-        .where(and(
-          gte(sessions.sessionDate, monthStart),
-          lte(sessions.sessionDate, monthEnd)
-        ));
-
+      const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
       monthlyStats.push({
         month: arabicMonths[monthDate.getMonth()],
         monthIndex: monthDate.getMonth(),
         year: monthDate.getFullYear(),
-        cases: monthCasesResult[0]?.count || 0,
-        sessions: monthSessionsResult[0]?.count || 0,
+        cases: casesCountMap.get(key) || 0,
+        sessions: sessionsCountMap.get(key) || 0,
       });
     }
 

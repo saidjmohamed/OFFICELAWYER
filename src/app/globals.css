@@ -161,12 +161,7 @@ body {
   background: oklch(0.5 0.02 260);
 }
 
-/* Smooth transitions */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
-}
+/* Smooth transitions for interactive elements only */
 
 /* Respect user preference for reduced motion */
 @media (prefers-reduced-motion: reduce) {
